@@ -24,7 +24,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".SensorActivity"
+            android:name=".ui.page.MainPage"
             android:exported="false" />
     </application>
 

@@ -1,4 +1,4 @@
-package com.example.polar
+package com.example.polar.ui.page
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,9 +13,10 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.polar.R
 import com.example.polar.ui.theme.PolarTheme
 
-class SensorActivity : ComponentActivity() {
+class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

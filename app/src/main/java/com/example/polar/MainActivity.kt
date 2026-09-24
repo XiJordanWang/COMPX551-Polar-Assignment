@@ -32,6 +32,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.ui.theme.PolarTheme
+import com.example.polar.ui.page.MainPage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,7 +89,7 @@ fun Greeting(modifier: Modifier = Modifier) {
 
             // https://developer.android.com/develop/ui/compose/components/button
             ElevatedButton(
-                onClick = { context.startActivity(Intent(context, SensorActivity::class.java)) },
+                onClick = { context.startActivity(Intent(context, MainPage::class.java)) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFFF5722),
                     contentColor = Color.White
