@@ -13,6 +13,7 @@ interface AssessmentDao {
     @Upsert
     suspend fun save(assessment: Assessment)
 
+    // test
     @Query("SELECT * FROM assessments WHERE username = :username LIMIT 1")
     suspend fun findByUsername(username: String): Assessment?
 
