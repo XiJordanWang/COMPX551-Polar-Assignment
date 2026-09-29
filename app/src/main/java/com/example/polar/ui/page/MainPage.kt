@@ -3,6 +3,7 @@ package com.example.polar.ui.page
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -36,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,7 +51,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -58,7 +64,10 @@ import com.example.polar.data.entity.Workout
 import com.example.polar.data.model.WorkoutType
 import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
+import com.example.polar.data.prefs.DeviceStore
+import com.example.polar.logic.cleanDeviceIdInput
 import com.example.polar.logic.formatDuration
+import com.example.polar.logic.isValidDeviceId
 import com.example.polar.logic.maxHeartRate
 import com.example.polar.logic.streakDays
 import com.example.polar.logic.todayPoints
@@ -101,6 +110,10 @@ fun SensorScreen(firstName: String, lastName: String, username: String) {
     val workouts by workoutsFlow.collectAsState(initial = emptyList())
     val assessment by assessmentFlow.collectAsState(initial = null)
 
+    // Polar H10 device ID, saved in SharedPreferences. Kept in state here
+    // so the home card updates as soon as it is changed on the profile tab.
+    var deviceId by remember { mutableStateOf(DeviceStore.getDeviceId(context)) }
+
     val title = when (tab) {
         "history" -> "History"
         "profile" -> "Profile"
@@ -124,9 +137,21 @@ fun SensorScreen(firstName: String, lastName: String, username: String) {
                     .padding(horizontal = 20.dp)
             ) {
                 when (tab) {
-                    "home" -> HomeContent(username, workouts, assessment)
+                    "home" -> HomeContent(
+                        username = username,
+                        workouts = workouts,
+                        assessment = assessment,
+                        deviceId = deviceId,
+                        onDeviceClick = { tab = "profile" }
+                    )
                     "history" -> HistoryContent(workouts, assessment)
-                    "profile" -> ProfileContent(firstName, lastName, username)
+                    "profile" -> ProfileContent(
+                        firstName = firstName,
+                        lastName = lastName,
+                        username = username,
+                        deviceId = deviceId,
+                        onDeviceIdSaved = { deviceId = it }
+                    )
                 }
                 // Space so the bottom bar doesn't cover the last card
                 Spacer(modifier = Modifier.height(130.dp))
@@ -206,7 +231,13 @@ fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 }
 
 @Composable
-fun HomeContent(username: String, workouts: List<Workout>, assessment: Assessment?) {
+fun HomeContent(
+    username: String,
+    workouts: List<Workout>,
+    assessment: Assessment?,
+    deviceId: String?,
+    onDeviceClick: () -> Unit
+) {
     val context = LocalContext.current
 
     // Zones need max heart rate. Use 220 - age if the user did the assessment.
@@ -226,6 +257,16 @@ fun HomeContent(username: String, workouts: List<Workout>, assessment: Assessmen
         StatCard(label = "🔥 Streak", value = "$streak", unit = if (streak == 1) "day" else "days", modifier = Modifier.weight(1f))
         StatCard(label = "⭐ Today", value = "$today", unit = "pts", modifier = Modifier.weight(1f))
     }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // Which Polar H10 we connect to. Tapping it opens the profile tab to add or change it.
+    ModuleCard(
+        emoji = "💓",
+        title = "My Polar H10",
+        subtitle = if (deviceId == null) "Not set · tap to add your device ID" else "Device ID: $deviceId",
+        onClick = onDeviceClick
+    )
 
     Spacer(modifier = Modifier.height(12.dp))
 
@@ -308,7 +349,13 @@ fun StatCard(label: String, value: String, unit: String, modifier: Modifier = Mo
 }
 
 @Composable
-fun ProfileContent(firstName: String, lastName: String, username: String) {
+fun ProfileContent(
+    firstName: String,
+    lastName: String,
+    username: String,
+    deviceId: String?,
+    onDeviceIdSaved: (String) -> Unit
+) {
     val context = LocalContext.current
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -322,6 +369,10 @@ fun ProfileContent(firstName: String, lastName: String, username: String) {
             Text(text = username, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
     }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    DeviceIdCard(savedId = deviceId, onSaved = onDeviceIdSaved)
 
     Spacer(modifier = Modifier.height(20.dp))
 
@@ -338,6 +389,71 @@ fun ProfileContent(firstName: String, lastName: String, username: String) {
             .height(56.dp)
     ) {
         Text(text = "Sign Out", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+// Type in and save the Polar H10 device ID
+@Composable
+fun DeviceIdCard(savedId: String?, onSaved: (String) -> Unit) {
+    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    // Start with the saved ID so the user can see and edit it
+    var input by remember(savedId) { mutableStateOf(savedId ?: "") }
+
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Text(text = "💓 My Polar H10", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "The 8-character ID printed on the back of your H10, e.g. B5E1A12F",
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextField(
+                value = input,
+                // Capital letters only, no spaces, max 8 characters
+                onValueChange = { input = cleanDeviceIdInput(it) },
+                placeholder = { Text("Device ID") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    keyboardType = KeyboardType.Ascii
+                ),
+                trailingIcon = {
+                    // Small green tick once the ID looks right
+                    if (isValidDeviceId(input)) {
+                        Text(text = "✓", color = Color(0xFF3E8E41), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                colors = fieldColors(),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = {
+                    if (isValidDeviceId(input)) {
+                        DeviceStore.saveDeviceId(context, input)
+                        onSaved(input)
+                        focusManager.clearFocus()
+                        Toast.makeText(context, "Device ID saved", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Device ID must be 8 characters (0-9, A-F)", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Orange, contentColor = Color.White),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text(text = if (savedId == null) "Save" else "Update", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 
