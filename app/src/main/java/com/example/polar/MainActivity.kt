@@ -33,8 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.polar.data.prefs.SessionStore
 import com.example.polar.logic.plantStages
 import com.example.polar.ui.page.GardenBackground
+import com.example.polar.ui.page.MainPage
 import com.example.polar.ui.page.PlantImage
 import com.example.polar.ui.page.SignPage
 import com.example.polar.ui.theme.Orange
@@ -45,6 +47,18 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val savedUser = SessionStore.getUser(this)
+        if (savedUser != null) {
+            val intent = Intent(this, MainPage::class.java).apply {
+                putExtra("firstName", savedUser.firstName)
+                putExtra("lastName", savedUser.lastName)
+                putExtra("username", savedUser.username)
+            }
+            startActivity(intent)
+            finish()
+            return
+        }
+
         enableEdgeToEdge()
         setContent {
             PolarTheme {

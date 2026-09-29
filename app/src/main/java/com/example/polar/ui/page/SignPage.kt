@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.User
+import com.example.polar.data.prefs.SessionStore
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
@@ -218,6 +219,7 @@ fun SignScreen() {
                                 val user = userDao.findByUsername(username)
                                 if (isSignIn) {
                                     if (user != null && user.password == password) {
+                                        SessionStore.saveUser(context, user.username, user.firstName, user.lastName)
                                         Toast.makeText(context, "Welcome back, ${user.firstName}!", Toast.LENGTH_SHORT).show()
                                         val intent = Intent(context, MainPage::class.java)
                                         intent.putExtra("firstName", user.firstName)
@@ -241,9 +243,14 @@ fun SignScreen() {
                                                 password = password
                                             )
                                         )
-                                        Toast.makeText(context, "Sign up success, please sign in", Toast.LENGTH_SHORT).show()
-                                        isSignIn = true
-                                        password = ""
+                                        SessionStore.saveUser(context, username, firstName, lastName)
+                                        Toast.makeText(context, "Welcome to Polar, $firstName!", Toast.LENGTH_SHORT).show()
+                                        val intent = Intent(context, MainPage::class.java)
+                                        intent.putExtra("firstName", firstName)
+                                        intent.putExtra("lastName", lastName)
+                                        intent.putExtra("username", username)
+                                        context.startActivity(intent)
+                                        (context as Activity).finish()
                                     }
                                 }
                             }
