@@ -45,3 +45,21 @@ fun startOfDay(daysAgo: Int): Long {
     calendar.add(Calendar.DAY_OF_MONTH, -daysAgo)
     return calendar.timeInMillis
 }
+
+// How many days in a row the user has worked out.
+// If there is no workout today yet, the streak still counts up to yesterday.
+fun streakDays(workouts: List<Workout>): Int {
+    fun hasWorkout(daysAgo: Int): Boolean {
+        val start = startOfDay(daysAgo)
+        val end = startOfDay(daysAgo - 1)
+        return workouts.any { it.startTime >= start && it.startTime < end }
+    }
+
+    var daysAgo = if (hasWorkout(0)) 0 else 1
+    var streak = 0
+    while (hasWorkout(daysAgo)) {
+        streak++
+        daysAgo++
+    }
+    return streak
+}

@@ -6,7 +6,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,29 +44,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.polar.R
 import com.example.polar.data.db.AppDatabase
+import com.example.polar.data.entity.Assessment
 import com.example.polar.data.entity.Workout
 import com.example.polar.data.model.WorkoutType
 import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
 import com.example.polar.logic.formatDuration
+import com.example.polar.logic.maxHeartRate
+import com.example.polar.logic.streakDays
+import com.example.polar.logic.todayPoints
+import com.example.polar.logic.totalPoints
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
-import kotlin.math.roundToInt
 
 class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,18 +104,11 @@ fun SensorScreen(firstName: String, lastName: String, username: String) {
     val title = when (tab) {
         "history" -> "History"
         "profile" -> "Profile"
-        else -> "Summary"
+        else -> "My Plant"
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.illustration_fitness_equipments_design_background),
-            contentDescription = "Background",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(radius = 16.dp)
-        )
+        GardenBackground()
 
         Column(modifier = Modifier.fillMaxSize()) {
             Header(
@@ -132,7 +124,7 @@ fun SensorScreen(firstName: String, lastName: String, username: String) {
                     .padding(horizontal = 20.dp)
             ) {
                 when (tab) {
-                    "home" -> HomeContent(username, workouts)
+                    "home" -> HomeContent(username, workouts, assessment)
                     "history" -> HistoryContent(workouts, assessment)
                     "profile" -> ProfileContent(firstName, lastName, username)
                 }
@@ -199,7 +191,7 @@ fun Header(firstName: String, title: String, initials: String, onAvatarClick: ()
     }
 }
 
-// See-through white card that looks good on the blurred background
+// See-through white card that looks good on the garden background
 @Composable
 fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(
@@ -214,17 +206,25 @@ fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 }
 
 @Composable
-fun HomeContent(username: String, workouts: List<Workout>) {
+fun HomeContent(username: String, workouts: List<Workout>, assessment: Assessment?) {
     val context = LocalContext.current
 
-    // Average of every workout's average heart rate
-    val avgHr = if (workouts.isEmpty()) "--" else workouts.map { it.avgHr }.average().roundToInt().toString()
+    // Zones need max heart rate. Use 220 - age if the user did the assessment.
+    val maxHr = if (assessment != null) maxHeartRate(assessment.age) else 200
+    // Only recalculate when the workouts or the assessment change
+    val points = remember(workouts, maxHr) { totalPoints(workouts, maxHr) }
+    val today = remember(workouts, maxHr) { todayPoints(workouts, maxHr) }
+    val streak = remember(workouts) { streakDays(workouts) }
 
     Spacer(modifier = Modifier.height(8.dp))
 
+    PlantCard(points = points)
+
+    Spacer(modifier = Modifier.height(12.dp))
+
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        StatCard(label = "Avg Heart Rate", value = avgHr, unit = "bpm", modifier = Modifier.weight(1f))
-        StatCard(label = "Workouts", value = "${workouts.size}", unit = "total", modifier = Modifier.weight(1f))
+        StatCard(label = "🔥 Streak", value = "$streak", unit = if (streak == 1) "day" else "days", modifier = Modifier.weight(1f))
+        StatCard(label = "⭐ Today", value = "$today", unit = "pts", modifier = Modifier.weight(1f))
     }
 
     Spacer(modifier = Modifier.height(12.dp))

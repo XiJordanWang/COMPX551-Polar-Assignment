@@ -5,34 +5,42 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.polar.ui.theme.PolarTheme
+import com.example.polar.logic.plantStages
+import com.example.polar.ui.page.GardenBackground
+import com.example.polar.ui.page.PlantImage
 import com.example.polar.ui.page.SignPage
+import com.example.polar.ui.theme.Orange
+import com.example.polar.ui.theme.PolarTheme
+import com.example.polar.ui.theme.WorkSans
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,20 +48,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PolarTheme {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Image(
-                        painter = painterResource(id = R.drawable.heart_beat_is_shown_black_background),
-                        contentDescription = "Background",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        containerColor = Color.Transparent
-                    ) { innerPadding ->
-                        Greeting(modifier = Modifier.padding(innerPadding))
-                    }
-                }
+                WelcomeScreen()
             }
         }
     }
@@ -61,45 +56,72 @@ class MainActivity : ComponentActivity() {
 //hi
 
 @Composable
-fun Greeting(modifier: Modifier = Modifier) {
-    val rainbowColors = listOf(Color.Yellow, Color.Cyan, Color.Magenta)
+fun WelcomeScreen() {
     val context = LocalContext.current
 
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+    // Show the plant growing from seed to flower, again and again,
+    // so people understand the idea of the app straight away
+    var stage by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1500)
+            stage = (stage + 1) % plantStages.size
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Big sunrise behind the plant, hills a bit higher than on the main page
+        GardenBackground(sunX = 0.5f, sunY = 0.42f, sunSize = 2.4f, cloudsY = 0.24f, hillsTop = 0.6f)
+
         Column(
             modifier = Modifier
-                .padding(start = 24.dp, end = 24.dp, bottom = 128.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // https://developer.android.com/develop/ui/compose/text/style-text
+            Spacer(modifier = Modifier.height(40.dp))
+
             Text(
-                text = buildAnnotatedString {
-                    withStyle(
-                        SpanStyle(
-                            brush = Brush.linearGradient(colors = rainbowColors),
-                            fontStyle = FontStyle.Italic
-                        )
-                    ) { append("Group 6's") }
-                    append(" assignment!")
-                },
+                text = "Polar Garden",
                 color = Color.White,
-                fontSize = 32.sp
+                fontSize = 44.sp,
+                fontFamily = WorkSans,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Every heartbeat helps your plant grow",
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 17.sp,
+                textAlign = TextAlign.Center
             )
 
+            Spacer(modifier = Modifier.weight(1f))
+
+            PlantImage(stageIndex = stage, progress = 0f, modifier = Modifier.size(280.dp))
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                text = "Group 6 · COMPX551",
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // https://developer.android.com/develop/ui/compose/components/button
-            ElevatedButton(
+            Button(
                 onClick = { context.startActivity(Intent(context, SignPage::class.java)) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF5722),
-                    contentColor = Color.White
-                ),
-                modifier = Modifier.size(width = 207.dp, height = 64.dp)
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Orange),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
             ) {
-                Text(text = "Watch Data", fontSize = 16.sp)
-
-
+                Text(text = "Get Started  →", fontSize = 17.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
