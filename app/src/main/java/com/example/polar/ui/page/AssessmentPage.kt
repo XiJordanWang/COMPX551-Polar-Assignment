@@ -46,8 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.polar.data.db.AppDatabase
-import com.example.polar.data.entity.Assessment
+import com.example.polar.data.online.Assessment
+import com.example.polar.data.online.AssessmentTable
 import com.example.polar.logic.bmiCategory
 import com.example.polar.logic.calculateBmi
 import com.example.polar.logic.maxHeartRate
@@ -76,7 +76,6 @@ class AssessmentPage : ComponentActivity() {
 @Composable
 fun AssessmentScreen(username: String) {
     val context = LocalContext.current
-    val assessmentDao = remember { AppDatabase.getDatabase(context).assessmentDao() }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -91,7 +90,8 @@ fun AssessmentScreen(username: String) {
 
     // If the user did the assessment before, fill in the form
     LaunchedEffect(Unit) {
-        val old = assessmentDao.findByUsername(username)
+        // Load from the online assessments table
+        val old = AssessmentTable.findByUsername(username)
         if (old != null) {
             gender = old.gender
             age = old.age.toString()
@@ -198,9 +198,13 @@ fun AssessmentScreen(username: String) {
                         intensity = intensity
                     )
                     scope.launch {
-                        assessmentDao.save(assessment)
-                        saved = assessment
-                        Toast.makeText(context, "Assessment saved", Toast.LENGTH_SHORT).show()
+                        // Save to the online assessments table
+                        if (AssessmentTable.save(assessment)) {
+                            saved = assessment
+                            Toast.makeText(context, "Assessment saved", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Could not save, check your internet", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             },

@@ -43,8 +43,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Workout
+import com.example.polar.data.online.AssessmentTable
+import com.example.polar.data.online.WorkoutSummary
+import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.logic.formatTime
 import com.example.polar.logic.maxHeartRate
+import com.example.polar.logic.workoutPoints
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
@@ -76,7 +80,8 @@ fun WorkoutScreen(workoutType: String, username: String) {
     // If the user did the assessment, use 220 - age instead.
     var userMaxHr by remember { mutableIntStateOf(200) }
     LaunchedEffect(Unit) {
-        val assessment = AppDatabase.getDatabase(context).assessmentDao().findByUsername(username)
+        // From the online assessments table. If there is no internet we keep 200.
+        val assessment = AssessmentTable.findByUsername(username)
         if (assessment != null) {
             userMaxHr = maxHeartRate(assessment.age)
         }
@@ -213,9 +218,24 @@ fun WorkoutScreen(workoutType: String, username: String) {
                             maxHr = maxHr,
                             heartRates = heartRates.joinToString(",")
                         )
+                        // Only the summary goes online, the heart rate of every second stays on the phone
+                        val summary = WorkoutSummary(
+                            username = username,
+                            type = workoutType,
+                            startTime = startTime,
+                            durationSec = heartRates.size,
+                            minHr = minHr,
+                            avgHr = avgHr,
+                            maxHr = maxHr,
+                            points = workoutPoints(heartRates, userMaxHr)
+                        )
                         scope.launch {
+                            // 1. Save the full workout on the phone (Room)
                             AppDatabase.getDatabase(context).workoutDao().insert(workout)
-                            Toast.makeText(context, "Workout saved", Toast.LENGTH_SHORT).show()
+                            // 2. Upload the summary (Supabase). If it fails, the workout is still saved locally.
+                            val uploaded = WorkoutSummaryTable.insert(summary)
+                            val message = if (uploaded) "Workout saved" else "Workout saved on this phone (upload failed)"
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                             (context as Activity).finish()
                         }
                     }

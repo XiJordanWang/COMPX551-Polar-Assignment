@@ -40,10 +40,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,12 +62,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.polar.data.db.AppDatabase
-import com.example.polar.data.entity.Assessment
+import com.example.polar.data.entity.Device
 import com.example.polar.data.entity.Workout
 import com.example.polar.data.model.WorkoutType
 import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
-import com.example.polar.data.prefs.DeviceStore
+import com.example.polar.data.online.Assessment
+import com.example.polar.data.online.AssessmentTable
 import com.example.polar.data.prefs.SessionStore
 import com.example.polar.logic.cleanDeviceIdInput
 import com.example.polar.logic.formatDuration
@@ -77,6 +81,7 @@ import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
+import kotlinx.coroutines.launch
 
 class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,30 +95,42 @@ class MainPage : ComponentActivity() {
 
         setContent {
             PolarTheme {
-                SensorScreen(firstName, lastName, username)
+                SensorScreen(firstName, lastName, username, resumeCount)
             }
         }
+    }
+
+    // Goes up by 1 every time this page comes back to the front,
+    // e.g. after the Assessment page. The screen uses it to reload online data.
+    private var resumeCount by mutableIntStateOf(0)
+
+    override fun onResume() {
+        super.onResume()
+        resumeCount++
     }
 }
 
 @Composable
-fun SensorScreen(firstName: String, lastName: String, username: String) {
+fun SensorScreen(firstName: String, lastName: String, username: String, resumeCount: Int) {
     // Which tab is showing: "home", "history" or "profile"
     var tab by remember { mutableStateOf("home") }
 
-    // Read workouts and assessment from Room. Because they are Flows,
-    // the screen updates by itself after a workout is saved.
+    // Local data (Room): workouts and the device ID. Because they are Flows,
+    // the screen updates by itself when they change.
     // remember {} so we don't create a new Flow every recomposition.
     val context = LocalContext.current
     val db = remember { AppDatabase.getDatabase(context) }
     val workoutsFlow = remember { db.workoutDao().getWorkouts(username) }
-    val assessmentFlow = remember { db.assessmentDao().observe(username) }
+    val deviceIdFlow = remember { db.deviceDao().observeDeviceId(username) }
     val workouts by workoutsFlow.collectAsState(initial = emptyList())
-    val assessment by assessmentFlow.collectAsState(initial = null)
+    val deviceId by deviceIdFlow.collectAsState(initial = null)
 
-    // Polar H10 device ID, saved in SharedPreferences. Kept in state here
-    // so the home card updates as soon as it is changed on the profile tab.
-    var deviceId by remember { mutableStateOf(DeviceStore.getDeviceId(context)) }
+    // Online data (Supabase): the assessment. Online tables don't update by themselves,
+    // so we load it again every time this page comes back (resumeCount changes).
+    var assessment by remember { mutableStateOf<Assessment?>(null) }
+    LaunchedEffect(resumeCount) {
+        assessment = AssessmentTable.findByUsername(username)
+    }
 
     val title = when (tab) {
         "history" -> "History"
@@ -150,8 +167,7 @@ fun SensorScreen(firstName: String, lastName: String, username: String) {
                         firstName = firstName,
                         lastName = lastName,
                         username = username,
-                        deviceId = deviceId,
-                        onDeviceIdSaved = { deviceId = it }
+                        deviceId = deviceId
                     )
                 }
                 // Space so the bottom bar doesn't cover the last card
@@ -354,8 +370,7 @@ fun ProfileContent(
     firstName: String,
     lastName: String,
     username: String,
-    deviceId: String?,
-    onDeviceIdSaved: (String) -> Unit
+    deviceId: String?
 ) {
     val context = LocalContext.current
 
@@ -373,7 +388,7 @@ fun ProfileContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    DeviceIdCard(savedId = deviceId, onSaved = onDeviceIdSaved)
+    DeviceIdCard(username = username, savedId = deviceId)
 
     Spacer(modifier = Modifier.height(20.dp))
 
@@ -398,9 +413,10 @@ fun ProfileContent(
 
 // Type in and save the Polar H10 device ID
 @Composable
-fun DeviceIdCard(savedId: String?, onSaved: (String) -> Unit) {
+fun DeviceIdCard(username: String, savedId: String?) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
     // Start with the saved ID so the user can see and edit it
     var input by remember(savedId) { mutableStateOf(savedId ?: "") }
 
@@ -441,10 +457,13 @@ fun DeviceIdCard(savedId: String?, onSaved: (String) -> Unit) {
             Button(
                 onClick = {
                     if (isValidDeviceId(input)) {
-                        DeviceStore.saveDeviceId(context, input)
-                        onSaved(input)
                         focusManager.clearFocus()
-                        Toast.makeText(context, "Device ID saved", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            // Save in the local devices table. The home card reads it with a Flow,
+                            // so it shows the new ID by itself.
+                            AppDatabase.getDatabase(context).deviceDao().save(Device(username, input))
+                            Toast.makeText(context, "Device ID saved", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
                         Toast.makeText(context, "Device ID must be 8 characters (0-9, A-F)", Toast.LENGTH_SHORT).show()
                     }

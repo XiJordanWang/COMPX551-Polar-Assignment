@@ -26,10 +26,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.polar.data.entity.Assessment
 import com.example.polar.data.entity.Workout
 import com.example.polar.data.entity.heartRateList
 import com.example.polar.data.model.emojiFor
+import com.example.polar.data.online.Assessment
 import com.example.polar.logic.caloriesBurned
 import com.example.polar.logic.dayLabels
 import com.example.polar.logic.formatDuration

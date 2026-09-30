@@ -6,20 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.example.polar.data.dao.AssessmentDao
-import com.example.polar.data.dao.UserDao
+import com.example.polar.data.dao.DeviceDao
 import com.example.polar.data.dao.WorkoutDao
-import com.example.polar.data.entity.Assessment
-import com.example.polar.data.entity.User
+import com.example.polar.data.entity.Device
 import com.example.polar.data.entity.Workout
 
+// Local database on the phone (Room = SQLite).
+// Users, assessments and workout summaries are online (Supabase), see data/online.
+// Only things that belong to this phone stay here: full workouts and the device ID.
 // https://developer.android.com/training/data-storage/room
-@Database(entities = [User::class, Assessment::class, Workout::class], version = 4, exportSchema = false)
+@Database(entities = [Workout::class, Device::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
-    abstract fun userDao(): UserDao
-    abstract fun assessmentDao(): AssessmentDao
     abstract fun workoutDao(): WorkoutDao
+    abstract fun deviceDao(): DeviceDao
 
     companion object {
         // Version 3 adds the assessments table. Users are kept.
@@ -57,6 +57,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Version 5: users and assessments moved to the online database,
+        // so remove them here, and add a table for the Polar H10 device ID.
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `users`")
+                db.execSQL("DROP TABLE IF EXISTS `assessments`")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `devices` (" +
+                            "`username` TEXT NOT NULL, " +
+                            "`deviceId` TEXT NOT NULL, " +
+                            "PRIMARY KEY(`username`))"
+                )
+            }
+        }
+
         // Only create the database once for the whole app
         @Volatile
         private var instance: AppDatabase? = null
@@ -68,7 +83,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "polar_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     // Version 1 used email, version 2 uses username.
                     // No real users yet, so just delete the old table instead of writing a migration.
                     .fallbackToDestructiveMigration(true)

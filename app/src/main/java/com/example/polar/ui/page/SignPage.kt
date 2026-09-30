@@ -49,9 +49,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.polar.data.db.AppDatabase
-import com.example.polar.data.entity.User
+import com.example.polar.data.online.User
+import com.example.polar.data.online.UserTable
 import com.example.polar.data.prefs.SessionStore
+import com.example.polar.logic.checkPassword
+import com.example.polar.logic.hashPassword
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
@@ -73,8 +75,8 @@ class SignPage : ComponentActivity() {
 @Composable
 fun SignScreen() {
     val context = LocalContext.current
-    val userDao = remember { AppDatabase.getDatabase(context).userDao() }
-    // Room functions are suspend functions, so they need a coroutine
+    // The online table functions are suspend functions (they wait for the network),
+    // so they need a coroutine
     val scope = rememberCoroutineScope()
 
     var firstName by remember { mutableStateOf("") }
@@ -216,9 +218,11 @@ fun SignScreen() {
                             Toast.makeText(context, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
                         } else {
                             scope.launch {
-                                val user = userDao.findByUsername(username)
+                                val user = UserTable.findByUsername(username)
                                 if (isSignIn) {
-                                    if (user != null && user.password == password) {
+                                    // Compare with the saved hash, we never store the real password
+                                    if (user != null && checkPassword(password, user.passwordHash)) {
+                                        // Remember this user so they don't have to sign in next time
                                         SessionStore.saveUser(context, user.username, user.firstName, user.lastName)
                                         Toast.makeText(context, "Welcome back, ${user.firstName}!", Toast.LENGTH_SHORT).show()
                                         val intent = Intent(context, MainPage::class.java)
@@ -229,28 +233,33 @@ fun SignScreen() {
                                         // Close the sign in page so back button doesn't return here
                                         (context as Activity).finish()
                                     } else {
-                                        Toast.makeText(context, "Wrong username or password", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Wrong username or password (or no internet)", Toast.LENGTH_SHORT).show()
                                     }
                                 } else {
                                     if (user != null) {
                                         Toast.makeText(context, "This username is already taken", Toast.LENGTH_SHORT).show()
                                     } else {
-                                        userDao.insert(
+                                        val saved = UserTable.insert(
                                             User(
+                                                username = username,
                                                 firstName = firstName,
                                                 lastName = lastName,
-                                                username = username,
-                                                password = password
+                                                passwordHash = hashPassword(password)
                                             )
                                         )
-                                        SessionStore.saveUser(context, username, firstName, lastName)
-                                        Toast.makeText(context, "Welcome to Polar, $firstName!", Toast.LENGTH_SHORT).show()
-                                        val intent = Intent(context, MainPage::class.java)
-                                        intent.putExtra("firstName", firstName)
-                                        intent.putExtra("lastName", lastName)
-                                        intent.putExtra("username", username)
-                                        context.startActivity(intent)
-                                        (context as Activity).finish()
+                                        if (saved) {
+                                            // Signed up, remember the user and go straight to the home page
+                                            SessionStore.saveUser(context, username, firstName, lastName)
+                                            Toast.makeText(context, "Welcome to Polar, $firstName!", Toast.LENGTH_SHORT).show()
+                                            val intent = Intent(context, MainPage::class.java)
+                                            intent.putExtra("firstName", firstName)
+                                            intent.putExtra("lastName", lastName)
+                                            intent.putExtra("username", username)
+                                            context.startActivity(intent)
+                                            (context as Activity).finish()
+                                        } else {
+                                            Toast.makeText(context, "Could not sign up, check your internet", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
                             }

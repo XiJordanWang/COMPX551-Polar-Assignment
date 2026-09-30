@@ -33,10 +33,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.db.AppDatabase
-import com.example.polar.data.entity.Assessment
 import com.example.polar.data.entity.Workout
 import com.example.polar.data.entity.heartRateList
 import com.example.polar.data.model.emojiFor
+import com.example.polar.data.online.Assessment
+import com.example.polar.data.online.AssessmentTable
 import com.example.polar.logic.caloriesBurned
 import com.example.polar.logic.formatDuration
 import com.example.polar.ui.theme.FieldGrey
@@ -73,7 +74,8 @@ fun WorkoutDetailScreen(workoutId: Long) {
         val found = db.workoutDao().findById(workoutId)
         workout = found
         if (found != null) {
-            assessment = db.assessmentDao().findByUsername(found.username)
+            // Calories need the assessment, which is in the online database
+            assessment = AssessmentTable.findByUsername(found.username)
         }
     }
 
