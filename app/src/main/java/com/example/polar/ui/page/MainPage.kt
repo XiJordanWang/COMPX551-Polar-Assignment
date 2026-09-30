@@ -65,6 +65,7 @@ import com.example.polar.data.model.WorkoutType
 import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
 import com.example.polar.data.prefs.DeviceStore
+import com.example.polar.data.prefs.SessionStore
 import com.example.polar.logic.cleanDeviceIdInput
 import com.example.polar.logic.formatDuration
 import com.example.polar.logic.isValidDeviceId
@@ -378,8 +379,11 @@ fun ProfileContent(
 
     Button(
         onClick = {
-            // Go back to the sign in page and close this one
-            context.startActivity(Intent(context, SignPage::class.java))
+            SessionStore.clear(context)
+            val intent = Intent(context, SignPage::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            context.startActivity(intent)
             (context as Activity).finish()
         },
         shape = RoundedCornerShape(20.dp),
@@ -388,7 +392,7 @@ fun ProfileContent(
             .fillMaxWidth()
             .height(56.dp)
     ) {
-        Text(text = "Sign Out", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(text = "Log Out", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
