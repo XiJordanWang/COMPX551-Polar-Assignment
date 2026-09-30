@@ -48,8 +48,18 @@ create policy "app can use users"             on users             for all to an
 create policy "app can use assessments"       on assessments       for all to anon using (true) with check (true);
 create policy "app can use workout_summaries" on workout_summaries for all to anon using (true) with check (true);
 
--- Example: a simple leaderboard (total points per user)
--- select username, sum(points) as total_points
--- from workout_summaries
--- group by username
--- order by total_points desc;
+-- Leaderboard: total points and number of workouts per user, used to compare plants.
+-- LEFT JOIN so users with no workouts yet still show up (with 0 points).
+-- Only username and first name are selected, so password hashes are never exposed.
+-- security_invoker = on: the view follows the same row level security as the tables.
+create or replace view leaderboard with (security_invoker = on) as
+select
+    u.username,
+    u.first_name,
+    coalesce(sum(w.points), 0)::int as total_points,
+    count(w.id)::int                as workouts
+from users u
+left join workout_summaries w on w.username = u.username
+group by u.username, u.first_name;
+
+grant select on leaderboard to anon;

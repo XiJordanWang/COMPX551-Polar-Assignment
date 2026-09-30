@@ -31,7 +31,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -134,6 +136,7 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
 
     val title = when (tab) {
         "history" -> "History"
+        "social" -> "Plant Friends"
         "profile" -> "Profile"
         else -> "My Plant"
     }
@@ -163,6 +166,7 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
                         onDeviceClick = { tab = "profile" }
                     )
                     "history" -> HistoryContent(workouts, assessment)
+                    "social" -> SocialContent(username)
                     "profile" -> ProfileContent(
                         firstName = firstName,
                         lastName = lastName,
@@ -506,7 +510,7 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
             .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        // White pill with Home on the left and History on the right
+        // White pill: Home and History on the left, Friends and Profile on the right
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -522,13 +526,27 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
                 onClick = { onTabClick("home") },
                 modifier = Modifier.weight(1f)
             )
-            // Empty space in the middle for the big button
-            Spacer(modifier = Modifier.width(88.dp))
             NavItem(
                 icon = Icons.Filled.DateRange,
                 label = "History",
                 selected = tab == "history",
                 onClick = { onTabClick("history") },
+                modifier = Modifier.weight(1f)
+            )
+            // Empty space in the middle for the big button
+            Spacer(modifier = Modifier.width(88.dp))
+            NavItem(
+                icon = Icons.Filled.Face,
+                label = "Friends",
+                selected = tab == "social",
+                onClick = { onTabClick("social") },
+                modifier = Modifier.weight(1f)
+            )
+            NavItem(
+                icon = Icons.Filled.Person,
+                label = "Profile",
+                selected = tab == "profile",
+                onClick = { onTabClick("profile") },
                 modifier = Modifier.weight(1f)
             )
         }

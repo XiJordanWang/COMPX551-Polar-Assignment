@@ -1,5 +1,6 @@
 package com.example.polar.data.online
 
+import android.util.Log
 import io.github.jan.supabase.postgrest.from
 
 // Writes to the online "workout_summaries" table.
@@ -12,6 +13,8 @@ object WorkoutSummaryTable {
             Supabase.client.from("workout_summaries").insert(summary)
             true
         } catch (e: Exception) {
+            // Shows the reason in Logcat (search for "WorkoutSummaryTable")
+            Log.e("WorkoutSummaryTable", "Online database error", e)
             false
         }
     }

@@ -1,5 +1,6 @@
 package com.example.polar.data.online
 
+import android.util.Log
 import io.github.jan.supabase.postgrest.from
 
 // Reads and writes the online "assessments" table.
@@ -13,6 +14,8 @@ object AssessmentTable {
                 .select { filter { eq("username", username) } }
                 .decodeSingleOrNull<Assessment>()
         } catch (e: Exception) {
+            // Shows the reason in Logcat (search for "AssessmentTable")
+            Log.e("AssessmentTable", "Online database error", e)
             null
         }
     }
@@ -23,6 +26,8 @@ object AssessmentTable {
             Supabase.client.from("assessments").upsert(assessment)
             true
         } catch (e: Exception) {
+            // Shows the reason in Logcat (search for "AssessmentTable")
+            Log.e("AssessmentTable", "Online database error", e)
             false
         }
     }
