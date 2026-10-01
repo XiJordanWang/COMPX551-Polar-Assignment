@@ -11,8 +11,13 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,7 +37,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -146,5 +153,58 @@ fun ConsentSection(title: String, content: String) {
         Text(text = title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(2.dp))
         Text(text = content, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
+    }
+}
+
+// Reusable privacy mode selection picker (Full / Share / Read-only)
+@Composable
+fun PrivacyModePicker(
+    selected: PrivacyMode,
+    onSelect: (PrivacyMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val modes = listOf(
+        PrivacyMode.FULL to "Full: All workout and ECG data shared publicly",
+        PrivacyMode.SHARE to "Share: Share workout summaries without ECG details",
+        PrivacyMode.READ_ONLY to "Read-only: Keep all workouts and health data private"
+    )
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for ((mode, description) in modes) {
+            val isSelected = mode == selected
+            val backgroundCol = if (isSelected) Color.White.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.15f)
+            val borderCol = if (isSelected) Color.White else Color.White.copy(alpha = 0.3f)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(backgroundCol)
+                    .border(1.dp, borderCol, RoundedCornerShape(16.dp))
+                    .clickable { onSelect(mode) }
+                    .padding(16.dp)
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = mode.name,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Text(text = "✓", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = description.substringAfter(": "),
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
     }
 }
