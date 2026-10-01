@@ -56,6 +56,18 @@
             android:name=".ui.page.WorkoutPage"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.page.SettingsPage"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.page.BaselinePage"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.page.H10GuidePage"
+            android:exported="false"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

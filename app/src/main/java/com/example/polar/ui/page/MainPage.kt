@@ -488,6 +488,39 @@ fun ProfileContent(
 
     DeviceIdCard(username = username, savedId = deviceId)
 
+    //setting button
+    Button(
+        onClick = {
+            val intent = Intent(
+                context,
+                SettingsPage::class.java
+            )
+
+            intent.putExtra(
+                "username",
+                username
+            )
+
+            context.startActivity(intent)
+        },
+        shape = RoundedCornerShape(20.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Orange,
+            contentColor = Color.White
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+    ) {
+        Text(
+            text = "Settings",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
     Spacer(modifier = Modifier.height(12.dp))
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {

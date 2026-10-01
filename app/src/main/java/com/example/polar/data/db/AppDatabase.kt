@@ -6,22 +6,34 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.polar.data.dao.BaselineDao
 import com.example.polar.data.dao.DeviceDao
 import com.example.polar.data.dao.EcgDao
 import com.example.polar.data.dao.WorkoutDao
+import com.example.polar.data.entity.Baseline
 import com.example.polar.data.entity.Device
 import com.example.polar.data.entity.EcgCheck
 import com.example.polar.data.entity.Workout
 
 // Local database on the phone (Room = SQLite).
 // Users, assessments and workout summaries are online (Supabase), see data/online.
-// Only things that belong to this phone stay here: full workouts, the device ID, and ECG checks.
+// Only things that belong to this phone stay here: full workouts and the device ID.
 // https://developer.android.com/training/data-storage/room
-@Database(entities = [Workout::class, Device::class, EcgCheck::class], version = 6, exportSchema = false)
+@Database(
+    entities = [
+        Workout::class,
+        Device::class,
+        Baseline::class,
+        EcgCheck::class
+    ],
+    version = 7,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun workoutDao(): WorkoutDao
     abstract fun deviceDao(): DeviceDao
+    abstract fun baselineDao(): BaselineDao
     abstract fun ecgDao(): EcgDao
 
     companion object {
@@ -74,9 +86,20 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
-
-        // Version 6 adds tables for the ECG checks.
         val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `baselines` (" +
+                            "`username` TEXT NOT NULL, " +
+                            "`baselineHr` INTEGER NOT NULL, " +
+                            "`createdAt` INTEGER NOT NULL, " +
+                            "PRIMARY KEY(`username`))"
+                )
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `ecg_checks` (" +
@@ -100,7 +123,16 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "polar_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
+                    )
+                    // Version 1 used email, version 2 uses username.
+                    // No real users yet, so just delete the old table instead of writing a migration.
+                    .fallbackToDestructiveMigration(true)
                     .build()
                 instance = db
                 db
