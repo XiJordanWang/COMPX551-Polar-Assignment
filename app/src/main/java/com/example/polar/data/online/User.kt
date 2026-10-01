@@ -12,5 +12,7 @@ data class User(
     @SerialName("first_name") val firstName: String,
     @SerialName("last_name") val lastName: String,
     // Never the real password, only the salted hash from hashPassword()
-    @SerialName("password_hash") val passwordHash: String
+    @SerialName("password_hash") val passwordHash: String,
+    val sharing: Boolean = false,
+    val streak: Int = 0
 )

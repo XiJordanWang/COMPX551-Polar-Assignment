@@ -18,4 +18,16 @@ object WorkoutSummaryTable {
             false
         }
     }
+
+    suspend fun deleteForUser(username: String): Boolean {
+        return try {
+            Supabase.client.from("workout_summaries").delete {
+                filter { eq("username", username) }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("WorkoutSummaryTable", "Online database error", e)
+            false
+        }
+    }
 }

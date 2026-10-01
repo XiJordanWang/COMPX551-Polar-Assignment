@@ -20,4 +20,7 @@ interface DeviceDao {
     // Same, but updates by itself when the device ID changes (for the screen)
     @Query("SELECT deviceId FROM devices WHERE username = :username LIMIT 1")
     fun observeDeviceId(username: String): Flow<String?>
+
+    @Query("DELETE FROM devices WHERE username = :username")
+    suspend fun deleteForUser(username: String)
 }

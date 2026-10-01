@@ -1,5 +1,77 @@
 package com.example.polar.ui.page
 
-/**
- * Merged into ConsentPage.kt
- */
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.polar.data.prefs.PrivacyMode
+
+// Reusable privacy mode selection picker (Full / Share / Read-only)
+@Composable
+fun PrivacyModePicker(
+    selected: PrivacyMode,
+    onSelect: (PrivacyMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val modes = listOf(
+        PrivacyMode.FULL to "Full: All workout and ECG data shared publicly",
+        PrivacyMode.SHARE to "Share: Share workout summaries without ECG details",
+        PrivacyMode.READ_ONLY to "Read-only: Keep all workouts and health data private"
+    )
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for ((mode, description) in modes) {
+            val isSelected = mode == selected
+            val backgroundCol = if (isSelected) Color.White.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.15f)
+            val borderCol = if (isSelected) Color.White else Color.White.copy(alpha = 0.3f)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(backgroundCol)
+                    .border(1.dp, borderCol, RoundedCornerShape(16.dp))
+                    .clickable { onSelect(mode) }
+                    .padding(16.dp)
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = mode.name,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Text(text = "✓", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = description.substringAfter(": "),
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}

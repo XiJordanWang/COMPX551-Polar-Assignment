@@ -46,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.polar.data.DataGate
+import com.example.polar.data.SaveResult
 import com.example.polar.data.online.Assessment
 import com.example.polar.data.online.AssessmentTable
 import com.example.polar.logic.bmiCategory
@@ -198,13 +200,14 @@ fun AssessmentScreen(username: String) {
                         intensity = intensity
                     )
                     scope.launch {
-                        // Save to the online assessments table
-                        if (AssessmentTable.save(assessment)) {
-                            saved = assessment
-                            Toast.makeText(context, "Assessment saved", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "Could not save, check your internet", Toast.LENGTH_SHORT).show()
+                        val result = DataGate.saveAssessment(context, username, assessment)
+                        saved = assessment
+                        val message = when (result) {
+                            SaveResult.READ_ONLY -> "Assessment calculated (read-only mode, not saved online)"
+                            SaveResult.SAVED_LOCAL_AND_ONLINE -> "Assessment saved"
+                            SaveResult.SAVED_LOCAL_ONLY -> "Assessment calculated"
                         }
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
                 }
             },

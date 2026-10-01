@@ -10,5 +10,6 @@ data class LeaderboardRow(
     val username: String,
     @SerialName("first_name") val firstName: String,
     @SerialName("total_points") val totalPoints: Int,
-    val workouts: Int
+    val workouts: Int,
+    val streak: Int = 0
 )

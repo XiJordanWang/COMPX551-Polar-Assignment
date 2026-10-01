@@ -49,11 +49,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.polar.data.DataGate
+import com.example.polar.data.SaveResult
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Workout
 import com.example.polar.data.online.AssessmentTable
 import com.example.polar.data.online.WorkoutSummary
-import com.example.polar.data.online.WorkoutSummaryTable
+import com.example.polar.data.prefs.PrivacyMode
+import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.data.polar.PolarManager
 import com.example.polar.logic.formatTime
 import com.example.polar.logic.maxHeartRate
@@ -184,6 +187,9 @@ fun WorkoutScreen(workoutType: String, username: String) {
     val minHr = heartRates.minOrNull() ?: 0
     val maxHr = heartRates.maxOrNull() ?: 0
     val avgHr = if (heartRates.isEmpty()) 0 else heartRates.average().toInt()
+    val modeFlow = remember { SettingsStore.privacyMode(context, username) }
+    val privacyMode by modeFlow.collectAsState(initial = PrivacyMode.FULL)
+
     // Only show the last 60 seconds on the line chart
     val lastMinute = heartRates.takeLast(60)
     val firstSecond = seconds - lastMinute.size + 1
@@ -198,6 +204,24 @@ fun WorkoutScreen(workoutType: String, username: String) {
                 .navigationBarsPadding()
                 .padding(20.dp)
         ) {
+            if (privacyMode == PrivacyMode.READ_ONLY) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFD32F2F), RoundedCornerShape(12.dp))
+                        .padding(vertical = 8.dp, horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Read-only: nothing will be saved",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             Text(
                 text = workoutType,
                 color = Color.White,
@@ -307,11 +331,12 @@ fun WorkoutScreen(workoutType: String, username: String) {
                             points = PointsCalculator.calculate(heartRates, PointsCalculator.DEFAULT_BASELINE_HR)
                         )
                         scope.launch {
-                            // 1. Save the full workout on the phone (Room)
-                            AppDatabase.getDatabase(context).workoutDao().insert(workout)
-                            // 2. Upload the summary (Supabase). If it fails, the workout is still saved locally.
-                            val uploaded = WorkoutSummaryTable.insert(summary)
-                            val message = if (uploaded) "Workout saved" else "Workout saved on this phone (upload failed)"
+                            val result = DataGate.saveWorkout(context, username, workout, summary)
+                            val message = when (result) {
+                                SaveResult.READ_ONLY -> "Not saved (read-only mode)"
+                                SaveResult.SAVED_LOCAL_AND_ONLINE -> "Workout saved"
+                                SaveResult.SAVED_LOCAL_ONLY -> "Workout saved on this phone"
+                            }
                             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                             (context as Activity).finish()
                         }

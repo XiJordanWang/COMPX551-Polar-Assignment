@@ -2,9 +2,11 @@ package com.example.polar.ui.page
 
 import android.app.Activity
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,8 +37,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.polar.data.db.AppDatabase
+import androidx.compose.runtime.collectAsState
+import com.example.polar.data.DataGate
+import com.example.polar.data.SaveResult
 import com.example.polar.data.entity.EcgCheck
+import com.example.polar.data.prefs.PrivacyMode
+import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.ECG_SAMPLE_RATE
 import com.example.polar.logic.fakeEcgValue
 import com.example.polar.logic.heartRateFromEcg
@@ -68,6 +74,8 @@ class EcgPage : ComponentActivity() {
 @Composable
 fun EcgScreen(username: String = "") {
     val context = LocalContext.current
+    val modeFlow = remember { SettingsStore.privacyMode(context, username) }
+    val privacyMode by modeFlow.collectAsState(initial = PrivacyMode.FULL)
 
     // "ready" -> "measuring" -> "done"
     var status by remember { mutableStateOf("ready") }
@@ -103,7 +111,10 @@ fun EcgScreen(username: String = "") {
                 restingHr = restingHr,
                 samples = allSamples.joinToString(",")
             )
-            AppDatabase.getDatabase(context).ecgDao().insert(check)
+            val result = DataGate.saveEcg(context, username, check)
+            if (result == SaveResult.READ_ONLY) {
+                Toast.makeText(context, "Not saved (read-only mode)", Toast.LENGTH_SHORT).show()
+            }
 
             status = "done"
         }
@@ -119,6 +130,24 @@ fun EcgScreen(username: String = "") {
                 .navigationBarsPadding()
                 .padding(20.dp)
         ) {
+            if (privacyMode == PrivacyMode.READ_ONLY) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFD32F2F), RoundedCornerShape(12.dp))
+                        .padding(vertical = 8.dp, horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Read-only: nothing will be saved",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             Text(
                 text = "ECG Check",
                 color = Color.White,

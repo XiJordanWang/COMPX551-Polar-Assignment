@@ -67,4 +67,16 @@ object SettingsStore {
             prefs[timeKey] = now.toString()
         }
     }
+
+    // Clears all DataStore settings keys for the specified user
+    suspend fun clearUserData(context: Context, username: String) {
+        val modeKey = stringPreferencesKey("mode_$username")
+        val versionKey = intPreferencesKey("consent_version_$username")
+        val timeKey = stringPreferencesKey("consent_time_$username")
+        context.dataStore.edit { prefs ->
+            prefs.remove(modeKey)
+            prefs.remove(versionKey)
+            prefs.remove(timeKey)
+        }
+    }
 }

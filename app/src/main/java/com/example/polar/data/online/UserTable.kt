@@ -34,4 +34,44 @@ object UserTable {
             false
         }
     }
+
+    suspend fun setSharing(username: String, sharing: Boolean): Boolean {
+        return try {
+            Supabase.client.from("users").update({
+                set("sharing", sharing)
+            }) {
+                filter { eq("username", username) }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("UserTable", "Online database error", e)
+            false
+        }
+    }
+
+    suspend fun setStreak(username: String, streak: Int): Boolean {
+        return try {
+            Supabase.client.from("users").update({
+                set("streak", streak)
+            }) {
+                filter { eq("username", username) }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("UserTable", "Online database error", e)
+            false
+        }
+    }
+
+    suspend fun deleteUser(username: String): Boolean {
+        return try {
+            Supabase.client.from("users").delete {
+                filter { eq("username", username) }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("UserTable", "Online database error", e)
+            false
+        }
+    }
 }

@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,12 +24,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.online.LeaderboardRow
 import com.example.polar.data.online.LeaderboardTable
+import com.example.polar.data.prefs.PrivacyMode
+import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.plantStages
 import com.example.polar.logic.progressToNextStage
 import com.example.polar.logic.stageIndexFor
@@ -36,21 +42,56 @@ import com.example.polar.logic.stageIndexFor
 // (from the online leaderboard view, see supabase/schema.sql).
 @Composable
 fun SocialContent(username: String) {
+    val context = LocalContext.current
+    val modeFlow = remember { SettingsStore.privacyMode(context, username) }
+    val privacyMode by modeFlow.collectAsState(initial = PrivacyMode.FULL)
+
     // null = not loaded yet or failed
     var rows by remember { mutableStateOf<List<LeaderboardRow>?>(null) }
     var loading by remember { mutableStateOf(true) }
 
-    // Runs every time the tab is opened, so the list is always fresh
-    LaunchedEffect(Unit) {
-        rows = LeaderboardTable.getAll()
+    // Runs every time the tab is opened or mode changes
+    LaunchedEffect(privacyMode) {
+        if (privacyMode == PrivacyMode.SHARE || privacyMode == PrivacyMode.FULL) {
+            rows = LeaderboardTable.getAll()
+        } else {
+            rows = emptyList()
+        }
         loading = false
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    if (privacyMode == PrivacyMode.READ_ONLY) {
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "🌱 Turn on sharing to see Plant Friends",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "You are currently in Read-only mode. Switch to Share mode on the Profile tab to see the garden and share your plant.",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        return
     }
 
     val list = rows
     // Where am I in the list? -1 if not found
     val myIndex = list?.indexOfFirst { it.username == username } ?: -1
-
-    Spacer(modifier = Modifier.height(8.dp))
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -67,7 +108,7 @@ fun SocialContent(username: String) {
         )
     }
 
-    if (list != null && list.isNotEmpty()) {
+    if (!list.isNullOrEmpty()) {
         Spacer(modifier = Modifier.height(20.dp))
         Podium(top = list.take(3), username = username)
 
@@ -107,7 +148,7 @@ fun PodiumSpot(row: LeaderboardRow, rank: Int, plantSize: Dp, blockHeight: Dp, i
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold
         )
-        Text(text = "${row.totalPoints} pts", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
+        Text(text = "${row.totalPoints} pts · 🔥 ${row.streak}", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
         Spacer(modifier = Modifier.height(4.dp))
         // The podium block, taller for a better rank
         Box(
@@ -151,7 +192,7 @@ fun RankRow(rank: Int, row: LeaderboardRow, isMe: Boolean) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${stage.name} · ${row.workouts} " + if (row.workouts == 1) "workout" else "workouts",
+                    text = "${stage.name} · ${row.workouts} " + if (row.workouts == 1) "workout" else "workouts" + " · 🔥 ${row.streak}",
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 13.sp
                 )

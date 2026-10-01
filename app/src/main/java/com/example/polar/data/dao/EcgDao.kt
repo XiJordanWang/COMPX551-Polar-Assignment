@@ -14,4 +14,7 @@ interface EcgDao {
 
     @Query("SELECT * FROM ecg_checks WHERE username = :username ORDER BY time DESC")
     fun getChecks(username: String): Flow<List<EcgCheck>>
+
+    @Query("DELETE FROM ecg_checks WHERE username = :username")
+    suspend fun deleteForUser(username: String)
 }

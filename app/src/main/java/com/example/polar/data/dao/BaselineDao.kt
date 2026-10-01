@@ -18,4 +18,7 @@ interface BaselineDao {
     fun observeBaseline(
         username: String
     ): Flow<Baseline?>
+
+    @Query("DELETE FROM baselines WHERE username = :username")
+    suspend fun deleteForUser(username: String)
 }

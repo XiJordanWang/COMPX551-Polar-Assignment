@@ -31,4 +31,16 @@ object AssessmentTable {
             false
         }
     }
+
+    suspend fun deleteForUser(username: String): Boolean {
+        return try {
+            Supabase.client.from("assessments").delete {
+                filter { eq("username", username) }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("AssessmentTable", "Online database error", e)
+            false
+        }
+    }
 }

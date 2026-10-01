@@ -10,8 +10,13 @@ create table if not exists users (
     first_name    text not null,
     last_name     text not null,
     password_hash text not null,
+    sharing       boolean not null default false,
+    streak        int not null default 0,
     created_at    timestamptz not null default now()
 );
+
+alter table users add column if not exists sharing boolean not null default false;
+alter table users add column if not exists streak int not null default 0;
 
 -- One assessment per user (saving again replaces it).
 create table if not exists assessments (
@@ -48,18 +53,18 @@ create policy "app can use users"             on users             for all to an
 create policy "app can use assessments"       on assessments       for all to anon using (true) with check (true);
 create policy "app can use workout_summaries" on workout_summaries for all to anon using (true) with check (true);
 
--- Leaderboard: total points and number of workouts per user, used to compare plants.
--- LEFT JOIN so users with no workouts yet still show up (with 0 points).
--- Only username and first name are selected, so password hashes are never exposed.
--- security_invoker = on: the view follows the same row level security as the tables.
+-- Leaderboard: total points, number of workouts, and streak per user.
+-- Filtered by u.sharing so non-sharing users never appear on the leaderboard.
 create or replace view leaderboard with (security_invoker = on) as
 select
     u.username,
     u.first_name,
+    u.streak,
     coalesce(sum(w.points), 0)::int as total_points,
     count(w.id)::int                as workouts
 from users u
 left join workout_summaries w on w.username = u.username
-group by u.username, u.first_name;
+where u.sharing
+group by u.username, u.first_name, u.streak;
 
 grant select on leaderboard to anon;
