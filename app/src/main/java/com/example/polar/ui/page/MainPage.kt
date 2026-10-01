@@ -89,7 +89,13 @@ import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -419,6 +425,52 @@ fun ProfileContent(
     deviceId: String?
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val db = remember { AppDatabase.getDatabase(context) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val workouts = db.workoutDao().getWorkouts(username).first()
+                    val ecgChecks = db.ecgDao().getChecks(username).first()
+
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
+                    val sb = StringBuilder()
+
+                    sb.append("=== WORKOUT SESSIONS ===\n")
+                    sb.append("ID,Type,Start Time,Duration (sec),Min HR,Avg HR,Max HR,Heart Rates\n")
+                    for (w in workouts) {
+                        val dateStr = dateFormat.format(Date(w.startTime))
+                        val hrString = "\"${w.heartRates}\""
+                        sb.append("${w.id},\"${w.type}\",$dateStr,${w.durationSec},${w.minHr},${w.avgHr},${w.maxHr},$hrString\n")
+                    }
+
+                    sb.append("\n=== ECG CHECKS ===\n")
+                    sb.append("ID,Time,Resting HR,Samples\n")
+                    for (ecg in ecgChecks) {
+                        val dateStr = dateFormat.format(Date(ecg.time))
+                        val sampleString = "\"${ecg.samples}\""
+                        sb.append("${ecg.id},$dateStr,${ecg.restingHr},$sampleString\n")
+                    }
+
+                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        outputStream.write(sb.toString().toByteArray(Charsets.UTF_8))
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Data exported successfully", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Export failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
 
     Spacer(modifier = Modifier.height(8.dp))
 
@@ -435,6 +487,33 @@ fun ProfileContent(
     Spacer(modifier = Modifier.height(12.dp))
 
     DeviceIdCard(username = username, savedId = deviceId)
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Text(text = "📁 Export Data", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Export your workout sessions and ECG checks as a CSV file.",
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ENGLISH).format(Date())
+                    exportLauncher.launch("polar_data_$timestamp.csv")
+                },
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Orange, contentColor = Color.White),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text(text = "Export My Data (CSV)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
 
     Spacer(modifier = Modifier.height(20.dp))
 

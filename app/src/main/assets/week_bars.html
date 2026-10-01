@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Daily Workouts and Rolling Mean</title>
     <style>
         html, body { margin: 0; height: 100%; background: transparent; }
         #chart { width: 100%; height: 100%; }
@@ -11,12 +12,12 @@
 <body>
 <div id="chart"></div>
 <script>
-    // Minutes of workout per day, with a line for the average
+    // Daily workout minutes (bars) with 7-day rolling mean (line)
     var chart = echarts.init(document.getElementById('chart'));
 
     chart.setOption({
-        grid: { left: 36, right: 12, top: 28, bottom: 28 },
-        tooltip: { trigger: 'axis', formatter: '{b}: {c} min' },
+        grid: { left: 36, right: 16, top: 28, bottom: 28 },
+        tooltip: { trigger: 'axis' },
         xAxis: {
             type: 'category',
             data: [],
@@ -31,31 +32,38 @@
             axisLabel: { color: '#ffffffcc' },
             splitLine: { lineStyle: { color: '#ffffff22' } }
         },
-        series: [{
-            type: 'bar',
-            data: [],
-            barMaxWidth: 28,
-            itemStyle: { color: '#ffffff', borderRadius: [6, 6, 0, 0] },
-            markLine: {
-                symbol: 'none',
-                lineStyle: { color: '#FFD60A', width: 2, type: 'solid' },
-                label: { color: '#FFD60A', formatter: 'avg {c}', position: 'insideEndTop' },
-                data: []
+        series: [
+            {
+                name: 'Minutes',
+                type: 'bar',
+                data: [],
+                barMaxWidth: 24,
+                itemStyle: { color: '#ffffff', borderRadius: [6, 6, 0, 0] }
+            },
+            {
+                name: '7-day Mean',
+                type: 'line',
+                data: [],
+                smooth: true,
+                showSymbol: true,
+                symbolSize: 6,
+                lineStyle: { color: '#FFD60A', width: 3 },
+                itemStyle: { color: '#FFD60A' }
             }
-        }]
+        ]
     });
 
     // Called from Kotlin
-    // labels:  ['Mon', 'Tue', ...]
+    // labels: ['Mon', 'Tue', ...]
     // minutes: [30, 0, 45, ...]
-    // average: 25
-    function setData(labels, minutes, average) {
+    // rollingMean: [25, 20, 22.5, ...]
+    function setData(labels, minutes, rollingMean) {
         chart.setOption({
             xAxis: { data: labels },
-            series: [{
-                data: minutes,
-                markLine: { data: average > 0 ? [{ yAxis: average }] : [] }
-            }]
+            series: [
+                { data: minutes },
+                { data: rollingMean }
+            ]
         });
     }
 
