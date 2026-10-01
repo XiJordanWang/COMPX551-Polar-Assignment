@@ -1,0 +1,21 @@
+package com.example.polar.data.dao
+
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
+import com.example.polar.data.entity.Baseline
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface BaselineDao {
+
+    @Upsert
+    suspend fun save(baseline: Baseline)
+
+    @Query(
+        "SELECT * FROM baselines WHERE username = :username"
+    )
+    fun observeBaseline(
+        username: String
+    ): Flow<Baseline?>
+}

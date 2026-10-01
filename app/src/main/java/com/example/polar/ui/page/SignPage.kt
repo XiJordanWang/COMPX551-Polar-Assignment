@@ -52,7 +52,9 @@ import androidx.compose.ui.unit.sp
 import com.example.polar.data.online.User
 import com.example.polar.data.online.UserTable
 import com.example.polar.data.prefs.SessionStore
+import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.checkPassword
+import kotlinx.coroutines.flow.first
 import com.example.polar.logic.hashPassword
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
@@ -222,15 +224,16 @@ fun SignScreen() {
                                 if (isSignIn) {
                                     // Compare with the saved hash, we never store the real password
                                     if (user != null && checkPassword(password, user.passwordHash)) {
-                                        // Remember this user so they don't have to sign in next time
                                         SessionStore.saveUser(context, user.username, user.firstName, user.lastName)
                                         Toast.makeText(context, "Welcome back, ${user.firstName}!", Toast.LENGTH_SHORT).show()
-                                        val intent = Intent(context, MainPage::class.java)
-                                        intent.putExtra("firstName", user.firstName)
-                                        intent.putExtra("lastName", user.lastName)
-                                        intent.putExtra("username", user.username)
+                                        val version = SettingsStore.consentVersion(context, user.username).first()
+                                        val targetClass = if (version < CONSENT_VERSION) ConsentPage::class.java else MainPage::class.java
+                                        val intent = Intent(context, targetClass).apply {
+                                            putExtra("firstName", user.firstName)
+                                            putExtra("lastName", user.lastName)
+                                            putExtra("username", user.username)
+                                        }
                                         context.startActivity(intent)
-                                        // Close the sign in page so back button doesn't return here
                                         (context as Activity).finish()
                                     } else {
                                         Toast.makeText(context, "Wrong username or password (or no internet)", Toast.LENGTH_SHORT).show()
@@ -248,13 +251,15 @@ fun SignScreen() {
                                             )
                                         )
                                         if (saved) {
-                                            // Signed up, remember the user and go straight to the home page
                                             SessionStore.saveUser(context, username, firstName, lastName)
                                             Toast.makeText(context, "Welcome to Polar, $firstName!", Toast.LENGTH_SHORT).show()
-                                            val intent = Intent(context, MainPage::class.java)
-                                            intent.putExtra("firstName", firstName)
-                                            intent.putExtra("lastName", lastName)
-                                            intent.putExtra("username", username)
+                                            val version = SettingsStore.consentVersion(context, username).first()
+                                            val targetClass = if (version < CONSENT_VERSION) ConsentPage::class.java else MainPage::class.java
+                                            val intent = Intent(context, targetClass).apply {
+                                                putExtra("firstName", firstName)
+                                                putExtra("lastName", lastName)
+                                                putExtra("username", username)
+                                            }
                                             context.startActivity(intent)
                                             (context as Activity).finish()
                                         } else {

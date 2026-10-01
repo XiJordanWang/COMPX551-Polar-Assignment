@@ -35,75 +35,109 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.polar.data.db.AppDatabase
-import com.example.polar.data.entity.EcgCheck
-import com.example.polar.logic.ECG_SAMPLE_RATE
-import com.example.polar.logic.fakeEcgValue
-import com.example.polar.logic.heartRateFromEcg
-import com.example.polar.logic.restingHrComment
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
-import kotlin.random.Random
+import com.example.polar.data.polar.PolarManager
+import androidx.compose.runtime.collectAsState
+import com.example.polar.data.db.AppDatabase
+import com.example.polar.data.entity.Baseline
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
-// How long one ECG reading takes
-const val ECG_SECONDS = 30
+// Duration of the baseline measurement
+private const val BASELINE_SECONDS = 30
 
-class EcgPage : ComponentActivity() {
+class BaselinePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        val username = intent.getStringExtra("username") ?: ""
-
         setContent {
             PolarTheme {
-                EcgScreen(username)
+                BaselineScreen()
             }
         }
     }
 }
 
 @Composable
-fun EcgScreen(username: String = "") {
+fun BaselineScreen() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val username = "demo"  //will replace "demo" later with the actual logged-in username.
+    val polarManager = remember {
+        PolarManager(context)
+    }
+    var restingHr by remember {
+        mutableIntStateOf(0)
+    }
+
+    val sensorData by polarManager.sensorData.collectAsState()
 
     // "ready" -> "measuring" -> "done"
     var status by remember { mutableStateOf("ready") }
-    var secondsLeft by remember { mutableIntStateOf(ECG_SECONDS) }
-    var restingHr by remember { mutableIntStateOf(0) }
-    // Every sample of this reading (30s x 130 = 3900 samples)
-    val allSamples = remember { mutableStateListOf<Int>() }
+    var secondsLeft by remember { mutableIntStateOf(BASELINE_SECONDS) }
+    var stable by remember { mutableStateOf(true) }
 
-    // Runs every time status changes. Only does work when measuring.
+    var variation by remember {
+        mutableIntStateOf(0)
+    }
+    // Heart-rate samples used to calculate resting baseline
+    val baselineValues = remember {
+        mutableStateListOf<Int>()
+    }
+
+
     LaunchedEffect(status) {
-        if (status == "measuring") {
-            allSamples.clear()
-            // TODO: replace this fake ECG with the real ECG stream from the Polar SDK
-            val fakeHr = Random.nextInt(58, 72)
-            var phase = 0.0 // where we are inside one heart beat, 0.0 to 1.0
 
-            // 10 times a second, add 13 samples (= 130 per second)
-            for (tick in 1..ECG_SECONDS * 10) {
-                delay(100)
-                for (i in 0 until 13) {
-                    phase += (fakeHr / 60.0) / ECG_SAMPLE_RATE
-                    if (phase >= 1.0) phase -= 1.0
-                    allSamples.add(fakeEcgValue(phase))
+        if (status == "measuring") {
+
+            baselineValues.clear()
+
+            for (second in 1..BASELINE_SECONDS) {
+
+                delay(1000)
+
+                secondsLeft = BASELINE_SECONDS - second
+
+                // Ignore first 5 seconds
+                if (second > 5 && sensorData.heartRate > 0) {
+                    baselineValues.add(
+                        sensorData.heartRate
+                    )
                 }
-                secondsLeft = ECG_SECONDS - tick / 10
             }
 
-            restingHr = heartRateFromEcg(allSamples)
+            restingHr =
+                if (baselineValues.isEmpty()) {
+                    0
+                } else {
+                    baselineValues.average().toInt()
+                }
 
-            val check = EcgCheck(
-                username = username,
-                time = System.currentTimeMillis(),
-                restingHr = restingHr,
-                samples = allSamples.joinToString(",")
-            )
-            AppDatabase.getDatabase(context).ecgDao().insert(check)
+            variation =
+                if (baselineValues.isEmpty()) {
+                    0
+                } else {
+                    (baselineValues.maxOrNull() ?: 0) -
+                            (baselineValues.minOrNull() ?: 0)
+                }
+
+            stable = variation < 10
+
+            scope.launch {
+                AppDatabase
+                    .getDatabase(context)
+                    .baselineDao()
+                    .save(
+                        Baseline(
+                            username = username,
+                            baselineHr = restingHr
+                        )
+                    )
+            }
 
             status = "done"
         }
@@ -120,7 +154,7 @@ fun EcgScreen(username: String = "") {
                 .padding(20.dp)
         ) {
             Text(
-                text = "ECG Check",
+                text = "Baseline Check",
                 color = Color.White,
                 fontSize = 36.sp,
                 fontFamily = WorkSans,
@@ -128,9 +162,14 @@ fun EcgScreen(username: String = "") {
             )
             Text(
                 text = when (status) {
-                    "ready" -> "Sit down, relax and stay still. The reading takes $ECG_SECONDS seconds."
-                    "measuring" -> "Recording... stay still. $secondsLeft s left"
-                    else -> "Done! Here is your result."
+                    "ready" ->
+                        "Sit relaxed and remain still. We will measure your resting heart rate baseline over 30 seconds."
+
+                    "measuring" ->
+                        "Recording... stay still. $secondsLeft s left"
+
+                    else ->
+                        "Baseline measurement completed."
                 },
                 color = Color.White.copy(alpha = 0.85f),
                 fontSize = 16.sp
@@ -138,14 +177,28 @@ fun EcgScreen(username: String = "") {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ECG chart, shows the last 3 seconds
+            // Live heart-rate display
             GlassCard(modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)) {
-                EChartsView(
-                    fileName = "ecg.html",
-                    script = "setData(${allSamples.takeLast(ECG_SAMPLE_RATE * 3)})"
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+
+                    Text(
+                        text = "${sensorData.heartRate}",
+                        color = Color.White,
+                        fontSize = 64.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "bpm",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 18.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -166,8 +219,20 @@ fun EcgScreen(username: String = "") {
                             )
                         }
                         Text(
-                            text = restingHrComment(restingHr),
+                            text = if (stable) {
+                                "Baseline is stable."
+                            } else {
+                                "Baseline unstable. Please sit still and retry."
+                            },
                             color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 14.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Variation: $variation bpm",
+                            color = Color.White.copy(alpha = 0.8f),
                             fontSize = 14.sp
                         )
                     }
@@ -180,7 +245,7 @@ fun EcgScreen(username: String = "") {
                     if (status == "done") {
                         (context as Activity).finish()
                     } else {
-                        secondsLeft = ECG_SECONDS
+                        secondsLeft = BASELINE_SECONDS
                         status = "measuring"
                     }
                 },
@@ -198,7 +263,7 @@ fun EcgScreen(username: String = "") {
             ) {
                 Text(
                     text = when (status) {
-                        "ready" -> "Start ECG"
+                        "ready" -> "Start Baseline"
                         "measuring" -> "Recording... $secondsLeft s"
                         else -> "Done"
                     },

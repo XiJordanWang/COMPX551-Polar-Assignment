@@ -4,6 +4,14 @@
 
     <!-- Needed for the online database (Firebase Firestore) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:allowBackup="true"
@@ -31,6 +39,9 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity
+            android:name=".ui.page.ConsentPage"
+            android:exported="false" />
+        <activity
             android:name=".ui.page.MainPage"
             android:exported="false" />
         <activity
@@ -46,6 +57,18 @@
             android:screenOrientation="portrait" />
         <activity
             android:name=".ui.page.WorkoutPage"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.page.SettingsPage"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.page.BaselinePage"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.page.H10GuidePage"
             android:exported="false"
             android:screenOrientation="portrait" />
     </application>
