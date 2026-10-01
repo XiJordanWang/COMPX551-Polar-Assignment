@@ -205,7 +205,7 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
                         deviceId = deviceId,
                         onDeviceClick = { tab = "profile" }
                     )
-                    "history" -> HistoryContent(workouts, assessment)
+                    "history" -> HistoryContent(username, assessment)
                     "social" -> SocialContent(username)
                     "profile" -> ProfileContent(
                         firstName = firstName,
@@ -359,7 +359,9 @@ fun HomeContent(
     Spacer(modifier = Modifier.height(12.dp))
 
     ModuleCard(emoji = "❤️", title = "ECG Check", subtitle = "30 second reading at rest") {
-        context.startActivity(Intent(context, EcgPage::class.java))
+        val intent = Intent(context, EcgPage::class.java)
+        intent.putExtra("username", username)
+        context.startActivity(intent)
     }
 
     Spacer(modifier = Modifier.height(12.dp))

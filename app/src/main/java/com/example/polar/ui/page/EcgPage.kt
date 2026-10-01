@@ -35,6 +35,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.polar.data.db.AppDatabase
+import com.example.polar.data.entity.EcgCheck
 import com.example.polar.logic.ECG_SAMPLE_RATE
 import com.example.polar.logic.fakeEcgValue
 import com.example.polar.logic.heartRateFromEcg
@@ -52,16 +54,19 @@ class EcgPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val username = intent.getStringExtra("username") ?: ""
+
         setContent {
             PolarTheme {
-                EcgScreen()
+                EcgScreen(username)
             }
         }
     }
 }
 
 @Composable
-fun EcgScreen() {
+fun EcgScreen(username: String = "") {
     val context = LocalContext.current
 
     // "ready" -> "measuring" -> "done"
@@ -91,6 +96,15 @@ fun EcgScreen() {
             }
 
             restingHr = heartRateFromEcg(allSamples)
+
+            val check = EcgCheck(
+                username = username,
+                time = System.currentTimeMillis(),
+                restingHr = restingHr,
+                samples = allSamples.joinToString(",")
+            )
+            AppDatabase.getDatabase(context).ecgDao().insert(check)
+
             status = "done"
         }
     }
