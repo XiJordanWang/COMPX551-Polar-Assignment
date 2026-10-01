@@ -48,6 +48,9 @@ fun startOfDay(daysAgo: Int): Long {
     return calendar.timeInMillis
 }
 
+// Daily goal: at least this many workout minutes in one day
+const val GOAL_MINUTES = 30
+
 // How many days in a row the user has met their workout goal.
 // If today's goal is not met yet, the streak still counts up to yesterday.
 fun streakDays(workouts: List<Workout>): Int {
@@ -111,7 +114,7 @@ fun dailyStats(workouts: List<Workout>, days: Int, maxHr: Int = 200): List<DaySt
 
         val totalSec = dayWorkouts.sumOf { it.durationSec }
         val minutes = (totalSec / 60.0 * 10).roundToInt() / 10.0
-        val points = dayWorkouts.sumOf { workoutPoints(it.heartRateList(), maxHr) }
+        val points = dayWorkouts.sumOf { PointsCalculator.calculate(it.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR) }
         val sessions = dayWorkouts.size
         val goalMet = minutes >= GOAL_MINUTES
 
@@ -269,10 +272,10 @@ fun calculatePersonalBests(
     } else LongestSessionBest()
 
     // Most points in one session (points + date)
-    val mostPointsWorkout = workouts.maxByOrNull { workoutPoints(it.heartRateList(), maxHr) }
+    val mostPointsWorkout = workouts.maxByOrNull { PointsCalculator.calculate(it.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR) }
     val mostPoints = if (mostPointsWorkout != null) {
         MostPointsBest(
-            points = workoutPoints(mostPointsWorkout.heartRateList(), maxHr),
+            points = PointsCalculator.calculate(mostPointsWorkout.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR),
             date = dateFormat.format(Date(mostPointsWorkout.startTime))
         )
     } else MostPointsBest()

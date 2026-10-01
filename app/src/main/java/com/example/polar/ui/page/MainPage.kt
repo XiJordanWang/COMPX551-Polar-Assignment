@@ -1,5 +1,6 @@
 package com.example.polar.ui.page
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,7 +12,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -68,6 +68,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
+import com.example.polar.BuildConfig
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Device
 import com.example.polar.data.entity.Workout
@@ -80,6 +82,7 @@ import com.example.polar.data.online.AssessmentTable
 import com.example.polar.data.online.WorkoutSummary
 import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.data.prefs.SessionStore
+import com.example.polar.logic.PointsCalculator
 import com.example.polar.logic.cleanDeviceIdInput
 import com.example.polar.logic.demoWorkouts
 import com.example.polar.logic.formatDuration
@@ -87,7 +90,6 @@ import com.example.polar.logic.isValidDeviceId
 import com.example.polar.logic.streakDays
 import com.example.polar.logic.todayPoints
 import com.example.polar.logic.totalPoints
-import com.example.polar.logic.PointsCalculator
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
@@ -170,7 +172,6 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
     // Local data (Room): workouts and the device ID. Because they are Flows,
     // the screen updates by itself when they change.
     // remember {} so we don't create a new Flow every recomposition.
-    val context = LocalContext.current
     val db = remember { AppDatabase.getDatabase(context) }
     val workoutsFlow = remember { db.workoutDao().getWorkouts(username) }
     val deviceIdFlow = remember { db.deviceDao().observeDeviceId(username) }
