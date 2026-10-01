@@ -7,16 +7,18 @@ import com.example.polar.data.entity.heartRateList
 
 data class PlantStage(val name: String, val minPoints: Int)
 
-// The plant grows through these stages as the user earns points
+// The plant grows through these stages as the user earns points.
+// A normal 30-45 minute workout gives about 500-800 points (see PointsCalculator),
+// so the plant sprouts after the first workout and blooms after about 10 workouts.
 val plantStages = listOf(
     PlantStage("Seed", 0),
-    PlantStage("Sprout", 20),
-    PlantStage("Seedling", 60),
-    PlantStage("Young Plant", 150),
-    PlantStage("Blooming", 300)
+    PlantStage("Sprout", 300),
+    PlantStage("Seedling", 1500),
+    PlantStage("Young Plant", 4000),
+    PlantStage("Blooming", 7500)
 )
 
-// Index in plantStages for this many points, e.g. 75 points -> 2 (Seedling)
+// Index in plantStages for this many points, e.g. 2000 points -> 2 (Seedling)
 fun stageIndexFor(points: Int): Int {
     var index = 0
     for (i in plantStages.indices) {
@@ -37,40 +39,15 @@ fun progressToNextStage(points: Int): Float {
 }
 
 // ---------- Points ----------
-// TODO: this is a placeholder. Replace with the team's baseline algorithm
-// (heart rate reserve from the 30 s resting baseline) when it is ready.
+// The rules are in PointsCalculator.kt
 
-const val GOAL_MINUTES = 30
-const val GOAL_BONUS = 20
-
-// Points per minute in each zone: Rest 0, Light 1, Moderate 2, Hard / Maximum 3.
-// Finishing a 30 minute workout gives a bonus.
-fun workoutPoints(heartRates: List<Int>, maxHr: Int): Int {
-    val limits = zoneLimits(maxHr)
-    var pointSeconds = 0
-    for (hr in heartRates) {
-        pointSeconds += when {
-            hr < limits[0] -> 0
-            hr < limits[1] -> 1
-            hr < limits[2] -> 2
-            else -> 3
-        }
-    }
-    // One heart rate per second, so divide by 60 to get "per minute"
-    var points = pointSeconds / 60
-    if (heartRates.size >= GOAL_MINUTES * 60) {
-        points += GOAL_BONUS
-    }
-    return points
+fun totalPoints(workouts: List<Workout>, baseline: Int): Int {
+    return workouts.sumOf { PointsCalculator.calculate(it.heartRateList(), baseline) }
 }
 
-fun totalPoints(workouts: List<Workout>, maxHr: Int): Int {
-    return workouts.sumOf { workoutPoints(it.heartRateList(), maxHr) }
-}
-
-fun todayPoints(workouts: List<Workout>, maxHr: Int): Int {
+fun todayPoints(workouts: List<Workout>, baseline: Int): Int {
     val today = startOfDay(daysAgo = 0)
     return workouts
         .filter { it.startTime >= today }
-        .sumOf { workoutPoints(it.heartRateList(), maxHr) }
+        .sumOf { PointsCalculator.calculate(it.heartRateList(), baseline) }
 }

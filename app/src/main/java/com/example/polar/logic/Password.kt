@@ -26,9 +26,14 @@ fun hashPassword(password: String): String {
 fun checkPassword(password: String, saved: String): Boolean {
     val parts = saved.split(":")
     if (parts.size != 2) return false
-    val salt = fromHex(parts[0])
-    val hash = pbkdf2(password, salt)
-    return toHex(hash) == parts[1]
+    return try {
+        val salt = fromHex(parts[0])
+        val hash = pbkdf2(password, salt)
+        toHex(hash) == parts[1]
+    } catch (e: NumberFormatException) {
+        // The saved value is not valid hex, so it can't match
+        false
+    }
 }
 
 private fun pbkdf2(password: String, salt: ByteArray): ByteArray {

@@ -16,6 +16,10 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE username = :username ORDER BY startTime DESC")
     fun getWorkouts(username: String): Flow<List<Workout>>
 
+    // Start times of this user's workouts, used so demo data isn't added twice
+    @Query("SELECT startTime FROM workouts WHERE username = :username")
+    suspend fun getStartTimes(username: String): List<Long>
+
     @Query("SELECT * FROM workouts WHERE id = :id")
     suspend fun findById(id: Long): Workout?
 }

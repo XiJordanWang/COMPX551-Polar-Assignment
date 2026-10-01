@@ -48,7 +48,7 @@ import com.example.polar.data.online.WorkoutSummary
 import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.logic.formatTime
 import com.example.polar.logic.maxHeartRate
-import com.example.polar.logic.workoutPoints
+import com.example.polar.logic.PointsCalculator
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
@@ -227,7 +227,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
                             minHr = minHr,
                             avgHr = avgHr,
                             maxHr = maxHr,
-                            points = workoutPoints(heartRates, userMaxHr)
+                            points = PointsCalculator.calculate(heartRates, PointsCalculator.DEFAULT_BASELINE_HR)
                         )
                         scope.launch {
                             // 1. Save the full workout on the phone (Room)

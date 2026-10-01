@@ -63,22 +63,27 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.polar.BuildConfig
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Device
 import com.example.polar.data.entity.Workout
+import com.example.polar.data.entity.heartRateList
 import com.example.polar.data.model.WorkoutType
 import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
 import com.example.polar.data.online.Assessment
 import com.example.polar.data.online.AssessmentTable
+import com.example.polar.data.online.WorkoutSummary
+import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.data.prefs.SessionStore
 import com.example.polar.logic.cleanDeviceIdInput
+import com.example.polar.logic.demoWorkouts
 import com.example.polar.logic.formatDuration
 import com.example.polar.logic.isValidDeviceId
-import com.example.polar.logic.maxHeartRate
 import com.example.polar.logic.streakDays
 import com.example.polar.logic.todayPoints
 import com.example.polar.logic.totalPoints
+import com.example.polar.logic.PointsCalculator
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
@@ -161,7 +166,6 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
                     "home" -> HomeContent(
                         username = username,
                         workouts = workouts,
-                        assessment = assessment,
                         deviceId = deviceId,
                         onDeviceClick = { tab = "profile" }
                     )
@@ -255,17 +259,16 @@ fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 fun HomeContent(
     username: String,
     workouts: List<Workout>,
-    assessment: Assessment?,
     deviceId: String?,
     onDeviceClick: () -> Unit
 ) {
     val context = LocalContext.current
 
-    // Zones need max heart rate. Use 220 - age if the user did the assessment.
-    val maxHr = if (assessment != null) maxHeartRate(assessment.age) else 200
-    // Only recalculate when the workouts or the assessment change
-    val points = remember(workouts, maxHr) { totalPoints(workouts, maxHr) }
-    val today = remember(workouts, maxHr) { todayPoints(workouts, maxHr) }
+    // Points compare heart rate with the resting baseline (see PointsCalculator).
+    // Only recalculate when the workouts change.
+    val baseline = PointsCalculator.DEFAULT_BASELINE_HR
+    val points = remember(workouts) { totalPoints(workouts, baseline) }
+    val today = remember(workouts) { todayPoints(workouts, baseline) }
     val streak = remember(workouts) { streakDays(workouts) }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -394,6 +397,12 @@ fun ProfileContent(
 
     DeviceIdCard(username = username, savedId = deviceId)
 
+    // Only in debug builds (when running from Android Studio), never in a release app
+    if (BuildConfig.DEBUG) {
+        Spacer(modifier = Modifier.height(12.dp))
+        DemoDataCard(username = username)
+    }
+
     Spacer(modifier = Modifier.height(20.dp))
 
     Button(
@@ -412,6 +421,71 @@ fun ProfileContent(
             .height(56.dp)
     ) {
         Text(text = "Log Out", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+// DEMO ONLY: adds sample workouts with simulated heart rate, so the charts,
+// the plant and the leaderboard have data before the Polar H10 is connected.
+@Composable
+fun DemoDataCard(username: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // True while saving, so the button can't be pressed twice
+    var adding by remember { mutableStateOf(false) }
+
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Text(text = "🧪 Demo data", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Adds about 10 sample workouts from the last 2 weeks (simulated heart rate). For testing and the demo only.",
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = {
+                    adding = true
+                    scope.launch {
+                        val workoutDao = AppDatabase.getDatabase(context).workoutDao()
+                        // Skip demo workouts that are already saved, so pressing twice doesn't double them
+                        val alreadySaved = workoutDao.getStartTimes(username)
+                        val workouts = demoWorkouts(username).filter { it.startTime !in alreadySaved }
+
+                        var uploaded = 0
+                        for (workout in workouts) {
+                            // Same as pressing Stop: full workout on the phone, summary online
+                            workoutDao.insert(workout)
+                            val summary = WorkoutSummary(
+                                username = username,
+                                type = workout.type,
+                                startTime = workout.startTime,
+                                durationSec = workout.durationSec,
+                                minHr = workout.minHr,
+                                avgHr = workout.avgHr,
+                                maxHr = workout.maxHr,
+                                points = PointsCalculator.calculate(workout.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR)
+                            )
+                            if (WorkoutSummaryTable.insert(summary)) {
+                                uploaded++
+                            }
+                        }
+                        adding = false
+                        val message = if (workouts.isEmpty()) "Demo workouts are already added" else "Added ${workouts.size} demo workouts ($uploaded uploaded)"
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = !adding,
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Orange),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text(text = if (adding) "Adding…" else "Add demo workouts", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 
