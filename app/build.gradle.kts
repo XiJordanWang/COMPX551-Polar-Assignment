@@ -85,4 +85,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation("com.github.polarofficial:polar-ble-sdk:5.5.0")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.6")
+    implementation("io.reactivex.rxjava3:rxandroid:3.0.2")
 }

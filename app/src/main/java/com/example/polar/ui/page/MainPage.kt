@@ -1,12 +1,18 @@
 package com.example.polar.ui.page
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -117,10 +123,44 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
     // Which tab is showing: "home", "history" or "profile"
     var tab by remember { mutableStateOf("home") }
 
+    val context = LocalContext.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            Toast.makeText(context, "Bluetooth permission granted", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val requestPermissionsIfNeeded = {
+        val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        }
+        val hasPermissions = permissionsToRequest.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (!hasPermissions) {
+            permissionLauncher.launch(permissionsToRequest)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        requestPermissionsIfNeeded()
+    }
+
     // Local data (Room): workouts and the device ID. Because they are Flows,
     // the screen updates by itself when they change.
     // remember {} so we don't create a new Flow every recomposition.
-    val context = LocalContext.current
     val db = remember { AppDatabase.getDatabase(context) }
     val workoutsFlow = remember { db.workoutDao().getWorkouts(username) }
     val deviceIdFlow = remember { db.deviceDao().observeDeviceId(username) }

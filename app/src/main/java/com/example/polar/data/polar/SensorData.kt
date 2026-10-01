@@ -5,5 +5,6 @@ data class SensorData(
     val accX: Float = 0f,
     val accY: Float = 0f,
     val accZ: Float = 0f,
-    val connected: Boolean = false
+    val connected: Boolean = false,
+    val deviceId: String = ""
 )
