@@ -1,5 +1,9 @@
 package com.example.polar
 
+/**
+ * Entry point activity checking user session and displaying the welcome screen.
+ */
+
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -34,7 +38,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.prefs.SessionStore
+import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.plantStages
+import com.example.polar.ui.page.CONSENT_VERSION
+import com.example.polar.ui.page.ConsentPage
 import com.example.polar.ui.page.GardenBackground
 import com.example.polar.ui.page.MainPage
 import com.example.polar.ui.page.PlantImage
@@ -43,13 +50,17 @@ import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val savedUser = SessionStore.getUser(this)
         if (savedUser != null) {
-            val intent = Intent(this, MainPage::class.java).apply {
+            val version = runBlocking { SettingsStore.consentVersion(this@MainActivity, savedUser.username).first() }
+            val targetClass = if (version < CONSENT_VERSION) ConsentPage::class.java else MainPage::class.java
+            val intent = Intent(this, targetClass).apply {
                 putExtra("firstName", savedUser.firstName)
                 putExtra("lastName", savedUser.lastName)
                 putExtra("username", savedUser.username)
@@ -67,14 +78,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-//hi
 
 @Composable
 fun WelcomeScreen() {
     val context = LocalContext.current
 
-    // Show the plant growing from seed to flower, again and again,
-    // so people understand the idea of the app straight away
     var stage by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -84,7 +92,6 @@ fun WelcomeScreen() {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Big sunrise behind the plant, hills a bit higher than on the main page
         GardenBackground(sunX = 0.5f, sunY = 0.42f, sunSize = 2.4f, cloudsY = 0.24f, hillsTop = 0.6f)
 
         Column(
@@ -126,7 +133,6 @@ fun WelcomeScreen() {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // https://developer.android.com/develop/ui/compose/components/button
             Button(
                 onClick = { context.startActivity(Intent(context, SignPage::class.java)) },
                 shape = RoundedCornerShape(20.dp),

@@ -39,6 +39,9 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity
+            android:name=".ui.page.ConsentPage"
+            android:exported="false" />
+        <activity
             android:name=".ui.page.MainPage"
             android:exported="false" />
         <activity
