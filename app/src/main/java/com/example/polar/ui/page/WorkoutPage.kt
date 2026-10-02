@@ -101,6 +101,8 @@ fun WorkoutScreen(workoutType: String, username: String) {
     }
     val deviceId by deviceIdFlow.collectAsState(initial = null)
     val sensorData by polarManager.sensorData.collectAsState() //hr values from polar
+    // Coach: sends a message if heart rate stays near the resting baseline (see InactivityCoach.kt)
+    InactivityCoach(username = username, sensorData = polarManager.sensorData)
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
