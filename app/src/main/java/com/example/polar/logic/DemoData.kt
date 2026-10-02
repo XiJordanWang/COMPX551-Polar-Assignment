@@ -41,20 +41,37 @@ fun demoHeartRates(durationSec: Int, restHr: Int, targetHr: Int, random: Random)
     return heartRates
 }
 
-// About 10 workouts spread over the last 14 days for this user.
-// Random(42) gives the same "random" data every time, so the demo is repeatable.
+// Points the demo workouts add up to (what the plant will show if there are no other workouts)
+const val DEMO_TARGET_POINTS = 5000
+
+// Demo workouts worth exactly DEMO_TARGET_POINTS, one sport after another
+// (Running, Walking, Swimming, ... so every sport is used), starting today and going back.
+// Random(42) gives the same "random" data every time, so the demo is repeatable
+// and pressing the button twice can skip what is already saved.
 fun demoWorkouts(username: String): List<Workout> {
     val random = Random(42)
+    val baseline = PointsCalculator.DEFAULT_BASELINE_HR
     val workouts = mutableListOf<Workout>()
+    var totalPoints = 0
 
-    for (daysAgo in 13 downTo 0) {
-        // Skip about 1 day in 3, like a real person
-        if (random.nextInt(3) == 0) continue
+    for (daysAgo in 0..30) {
+        if (totalPoints >= DEMO_TARGET_POINTS) break
+        // Skip about 1 day in 4, like a real person (but always train today)
+        if (daysAgo > 0 && random.nextInt(4) == 0) continue
 
-        val type = workoutTypes[random.nextInt(workoutTypes.size)]
-        val minutes = random.nextInt(15, 51)          // 15 to 50 minutes
+        // Every sport in turn, so all of them appear in the history
+        val type = workoutTypes[workouts.size % workoutTypes.size]
+        val minutes = random.nextInt(20, 41)          // 20 to 40 minutes
         val targetHr = random.nextInt(115, 161)       // how hard this workout was
-        val heartRates = demoHeartRates(minutes * 60, restHr = 68, targetHr = targetHr, random = random)
+        val heartRates = demoHeartRates(minutes * 60, restHr = 68, targetHr = targetHr, random = random).toMutableList()
+
+        // Last workout: cut seconds off the end until the total is exactly the target
+        var points = PointsCalculator.calculate(heartRates, baseline)
+        while (totalPoints + points > DEMO_TARGET_POINTS) {
+            heartRates.removeAt(heartRates.size - 1)
+            points = PointsCalculator.calculate(heartRates, baseline)
+        }
+        totalPoints += points
 
         // Start at 7am or 6pm on that day
         val calendar = Calendar.getInstance()
@@ -66,14 +83,14 @@ fun demoWorkouts(username: String): List<Workout> {
         // Today's 6pm might still be in the future, so move it back to this morning instead
         if (calendar.timeInMillis + heartRates.size * 1000L > System.currentTimeMillis()) {
             calendar.set(Calendar.HOUR_OF_DAY, 7)
+            calendar.set(Calendar.MINUTE, 0)
         }
-        val startTime = calendar.timeInMillis
 
         workouts.add(
             Workout(
                 username = username,
                 type = type.name,
-                startTime = startTime,
+                startTime = calendar.timeInMillis,
                 durationSec = heartRates.size,
                 minHr = heartRates.min(),
                 avgHr = heartRates.average().roundToInt(),
@@ -82,5 +99,6 @@ fun demoWorkouts(username: String): List<Workout> {
             )
         )
     }
-    return workouts
+    // Oldest first, like real workouts would be saved
+    return workouts.reversed()
 }
