@@ -62,6 +62,7 @@ import com.example.polar.data.polar.PolarManager
 import com.example.polar.logic.formatTime
 import com.example.polar.logic.maxHeartRate
 import com.example.polar.logic.PointsCalculator
+import com.example.polar.service.WorkoutService
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
@@ -101,6 +102,12 @@ fun WorkoutScreen(workoutType: String, username: String) {
     }
     val deviceId by deviceIdFlow.collectAsState(initial = null)
     val sensorData by polarManager.sensorData.collectAsState() //hr values from polar
+    // Foreground service: keeps the app alive with the screen off while this page is open.
+    // Stopped when the page closes (Stop button or back), see WorkoutService.kt
+    DisposableEffect(Unit) {
+        WorkoutService.start(context)
+        onDispose { WorkoutService.stop(context) }
+    }
     // Coach: sends a message if heart rate stays near the resting baseline (see InactivityCoach.kt)
     InactivityCoach(username = username, sensorData = polarManager.sensorData)
 

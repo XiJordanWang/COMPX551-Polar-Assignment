@@ -16,6 +16,13 @@
     <!-- Coach messages (Android 13+ also asks the user at runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Workout keeps running with the screen off (foreground service, type "health").
+         Android 14+ also needs one of ACTIVITY_RECOGNITION / BODY_SENSORS / HIGH_SAMPLING_RATE_SENSORS
+         for a health service; HIGH_SAMPLING_RATE_SENSORS is a normal permission (no pop-up). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -74,6 +81,10 @@
             android:name=".ui.page.H10GuidePage"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <service
+            android:name=".service.WorkoutService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
     </application>
 
 </manifest>
