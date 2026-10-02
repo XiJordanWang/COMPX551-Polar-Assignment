@@ -33,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -140,6 +141,13 @@ fun WorkoutScreen(workoutType: String, username: String) {
                 Log.d("POLAR", "Requesting bluetooth permissions for $deviceId")
                 permissionLauncher.launch(permissionsToRequest)
             }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            Log.d("POLAR", "WorkoutScreen disposed, disconnecting")
+            polarManager.disconnect(deviceId)
         }
     }
 

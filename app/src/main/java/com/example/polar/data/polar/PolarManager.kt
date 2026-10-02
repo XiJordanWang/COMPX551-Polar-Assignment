@@ -30,6 +30,12 @@ class PolarManager(context: Context) {
     private var accDisposable: Disposable? = null
 
     init {
+        try {
+            api.setAutomaticReconnection(true)
+        } catch (e: Exception) {
+            Log.e("POLAR", "Error enabling automatic reconnection: ${e.message}")
+        }
+
         api.setApiCallback(object : PolarBleApiCallback() {
 
             override fun deviceConnecting(
@@ -47,6 +53,9 @@ class PolarManager(context: Context) {
                     connected = true,
                     deviceId = polarDeviceInfo.deviceId
                 )
+                if (api.isFeatureReady(polarDeviceInfo.deviceId, PolarBleApi.PolarBleSdkFeature.FEATURE_HR)) {
+                    startHrStreaming(polarDeviceInfo.deviceId)
+                }
             }
 
             override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo) {
@@ -88,6 +97,8 @@ class PolarManager(context: Context) {
                 },
                 { error ->
                     Log.e("POLAR", "Error streaming HR: ${error.message}", error)
+                    hrDisposable?.dispose()
+                    hrDisposable = null
                 }
             )
     }
@@ -111,11 +122,14 @@ class PolarManager(context: Context) {
                 },
                 { error ->
                     Log.e("POLAR", "Error streaming ACC: ${error.message}", error)
+                    accDisposable?.dispose()
+                    accDisposable = null
                 }
             )
     }
 
     fun connect(deviceId: String) {
+        if (deviceId.isBlank()) return
         Log.d("POLAR", "connect() called for $deviceId")
         try {
             api.connectToDevice(deviceId)
@@ -128,16 +142,22 @@ class PolarManager(context: Context) {
     fun disconnect(deviceId: String? = null) {
         cleanupStreams()
         try {
-            if (deviceId != null) {
-                api.disconnectFromDevice(deviceId)
-            } else {
-                val currentId = _sensorData.value.deviceId
-                if (currentId.isNotEmpty()) {
-                    api.disconnectFromDevice(currentId)
-                }
+            val targetId = deviceId ?: _sensorData.value.deviceId
+            if (targetId.isNotEmpty()) {
+                api.disconnectFromDevice(targetId)
             }
         } catch (e: Exception) {
             Log.e("POLAR", "Disconnect error: ${e.message}", e)
+        }
+    }
+
+    fun shutDown(deviceId: String? = null) {
+        disconnect(deviceId)
+        try {
+            api.cleanup()
+            api.shutDown()
+        } catch (e: Exception) {
+            Log.e("POLAR", "Shutdown error: ${e.message}", e)
         }
     }
 

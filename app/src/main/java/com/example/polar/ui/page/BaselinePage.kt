@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -53,23 +54,43 @@ class BaselinePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val username = intent.getStringExtra("username") ?: "demo"
         setContent {
             PolarTheme {
-                BaselineScreen()
+                BaselineScreen(username)
             }
         }
     }
 }
 
 @Composable
-fun BaselineScreen() {
+fun BaselineScreen(username: String = "demo") {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val username = "demo"  //will replace "demo" later with the actual logged-in username.
     val polarManager = remember {
         PolarManager(context)
     }
+    val db = remember {
+        AppDatabase.getDatabase(context)
+    }
+    val deviceIdFlow = remember {
+        db.deviceDao().observeDeviceId(username)
+    }
+    val deviceId by deviceIdFlow.collectAsState(initial = null)
+
+    LaunchedEffect(deviceId) {
+        if (!deviceId.isNullOrBlank()) {
+            polarManager.connect(deviceId!!)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            polarManager.disconnect(deviceId)
+        }
+    }
+
     var restingHr by remember {
         mutableIntStateOf(0)
     }

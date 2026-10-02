@@ -109,12 +109,10 @@ fun SettingsScreen(username: String) {
 
         Button(
             onClick = {
-                context.startActivity(
-                    Intent(
-                        context,
-                        BaselinePage::class.java
-                    )
-                )
+                val intent = Intent(context, BaselinePage::class.java).apply {
+                    putExtra("username", username)
+                }
+                context.startActivity(intent)
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = Orange
