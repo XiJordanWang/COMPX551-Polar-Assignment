@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.example.polar.data.prefs.SessionStore
 import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.plantStages
+import com.example.polar.notify.CoachNotifier
 import com.example.polar.ui.page.CONSENT_VERSION
 import com.example.polar.ui.page.ConsentPage
 import com.example.polar.ui.page.GardenBackground
@@ -56,6 +57,8 @@ import kotlinx.coroutines.runBlocking
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Create the notification channels first, before we may jump to another page below
+        CoachNotifier.createChannels(this)
         val savedUser = SessionStore.getUser(this)
         if (savedUser != null) {
             val version = runBlocking { SettingsStore.consentVersion(this@MainActivity, savedUser.username).first() }

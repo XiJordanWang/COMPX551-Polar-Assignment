@@ -48,9 +48,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
-import com.example.polar.data.online.UserTable
-import com.example.polar.data.prefs.PrivacyMode
-import com.example.polar.data.prefs.SettingsStore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -84,17 +81,25 @@ import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
 import com.example.polar.data.online.Assessment
 import com.example.polar.data.online.AssessmentTable
+import com.example.polar.data.online.UserTable
 import com.example.polar.data.online.WorkoutSummary
 import com.example.polar.data.online.WorkoutSummaryTable
+import com.example.polar.data.prefs.PrivacyMode
 import com.example.polar.data.prefs.SessionStore
+import com.example.polar.data.prefs.SettingsStore
+import com.example.polar.logic.CoachMode
+import com.example.polar.logic.CoachTrigger
+import com.example.polar.logic.DEMO_TARGET_POINTS
 import com.example.polar.logic.PointsCalculator
 import com.example.polar.logic.cleanDeviceIdInput
 import com.example.polar.logic.demoWorkouts
 import com.example.polar.logic.formatDuration
 import com.example.polar.logic.isValidDeviceId
+import com.example.polar.logic.pickMessage
 import com.example.polar.logic.streakDays
 import com.example.polar.logic.todayPoints
 import com.example.polar.logic.totalPoints
+import com.example.polar.notify.CoachNotifier
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
@@ -106,6 +111,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.random.Random
 
 class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -733,11 +739,41 @@ fun DemoDataCard(username: String) {
     // True while saving, so the button can't be pressed twice
     var adding by remember { mutableStateOf(false) }
 
+    // TEMPORARY test of coach notifications
+    var testMode by remember { mutableStateOf("Mixed") }
+    var lastMessage by remember { mutableStateOf<String?>(null) }
+
+    val sendTestMessage = {
+        val mode = when (testMode) {
+            "Supportive" -> CoachMode.SUPPORTIVE
+            "Bully" -> CoachMode.BULLY
+            else -> CoachMode.MIXED
+        }
+        // Any of the 3 triggers, so we can see different messages
+        val trigger = CoachTrigger.entries.random()
+        val message = pickMessage(mode, trigger, Random.Default, lastMessage)
+        if (message != null) {
+            CoachNotifier.showCoachMessage(context, message)
+            lastMessage = message
+            Toast.makeText(context, "Sent a $trigger message. Pull down the notification bar.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val testPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            sendTestMessage()
+        } else {
+            Toast.makeText(context, "Notifications not allowed, so nothing is shown", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Text(text = "🧪 Demo data", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Text(
-                text = "Adds about 10 sample workouts from the last 2 weeks (simulated heart rate). For testing and the demo only.",
+                text = "Adds sample workouts in every sport, worth $DEMO_TARGET_POINTS points in total (simulated heart rate). For testing and the demo only.",
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 14.sp
             )
@@ -784,6 +820,41 @@ fun DemoDataCard(username: String) {
                     .height(52.dp)
             ) {
                 Text(text = if (adding) "Adding…" else "Add demo workouts", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            // ---------- TEMPORARY: try a coach notification on the phone ----------
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(text = "🔔 Test coach message", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            ChoiceRow(
+                options = listOf("Supportive", "Bully", "Mixed"),
+                selected = testMode,
+                onSelect = { testMode = it }
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    if (CoachNotifier.hasPermission(context)) {
+                        sendTestMessage()
+                    } else if (CoachNotifier.shouldAskPermission(context)) {
+                        // Android 13+ and never asked: ask now, then send (see the launcher above)
+                        CoachNotifier.markPermissionAsked(context)
+                        testPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "Notifications are off. Turn them on in Settings → Apps → Polar → Notifications.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                },
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Orange),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text(text = "Send test coach message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -863,15 +934,37 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
     val context = LocalContext.current
     // Show the "choose workout" popup when the big button is pressed
     var showPicker by remember { mutableStateOf(false) }
+    // The sport the user picked, while we wait for the notification permission answer
+    var pendingType by remember { mutableStateOf<WorkoutType?>(null) }
+
+    val startWorkout = { type: WorkoutType ->
+        val intent = Intent(context, WorkoutPage::class.java)
+        intent.putExtra("workoutType", type.name)
+        intent.putExtra("username", username)
+        context.startActivity(intent)
+    }
+
+    // Android 13+: asks "Allow Polar to send you notifications?".
+    // Allow or not, the workout starts afterwards. Without permission, coach messages are just skipped.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        pendingType?.let { startWorkout(it) }
+        pendingType = null
+    }
 
     if (showPicker) {
         WorkoutPicker(
             onPick = { type ->
                 showPicker = false
-                val intent = Intent(context, WorkoutPage::class.java)
-                intent.putExtra("workoutType", type.name)
-                intent.putExtra("username", username)
-                context.startActivity(intent)
+                // Only before the first workout, only on Android 13+, only if not allowed yet
+                if (CoachNotifier.shouldAskPermission(context)) {
+                    CoachNotifier.markPermissionAsked(context)
+                    pendingType = type
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    startWorkout(type)
+                }
             },
             onDismiss = { showPicker = false }
         )
