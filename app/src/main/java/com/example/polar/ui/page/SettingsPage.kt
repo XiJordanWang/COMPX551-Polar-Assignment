@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -28,9 +29,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.db.AppDatabase
+import com.example.polar.data.prefs.SettingsStore
+import com.example.polar.logic.CoachMode
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
+import kotlinx.coroutines.launch
 
 class SettingsPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +65,11 @@ fun SettingsScreen(username: String) {
     }
 
     val baseline by baselineFlow.collectAsState(initial = null)
+
+    // Coach personality, saved per user in DataStore (SettingsStore)
+    val scope = rememberCoroutineScope()
+    val coachModeFlow = remember { SettingsStore.coachMode(context, username) }
+    val coachMode by coachModeFlow.collectAsState(initial = CoachMode.SUPPORTIVE)
 
     GardenBackground()
 
@@ -120,6 +129,37 @@ fun SettingsScreen(username: String) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Recalculate Baseline")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Coach personality: how coach messages talk to the user
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                Text(text = "Coach personality", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                Text(
+                    text = when (coachMode) {
+                        CoachMode.SUPPORTIVE -> "Kind and encouraging messages"
+                        CoachMode.BULLY -> "Playful teasing about your plant"
+                        CoachMode.MIXED -> "A bit of both"
+                        CoachMode.OFF -> "No coach messages"
+                    },
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                // SUPPORTIVE -> "Supportive", and back again with uppercase()
+                ChoiceRow(
+                    options = CoachMode.entries.map { it.name.lowercase().replaceFirstChar { c -> c.uppercase() } },
+                    selected = coachMode.name.lowercase().replaceFirstChar { c -> c.uppercase() },
+                    onSelect = { label ->
+                        scope.launch {
+                            SettingsStore.setCoachMode(context, username, CoachMode.valueOf(label.uppercase()))
+                        }
+                    }
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

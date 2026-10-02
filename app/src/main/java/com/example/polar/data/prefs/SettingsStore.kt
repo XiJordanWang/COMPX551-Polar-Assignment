@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.polar.logic.CoachMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -36,6 +37,27 @@ object SettingsStore {
     // Updates PrivacyMode for the given username
     suspend fun setPrivacyMode(context: Context, username: String, mode: PrivacyMode) {
         val key = stringPreferencesKey("mode_$username")
+        context.dataStore.edit { prefs ->
+            prefs[key] = mode.name
+        }
+    }
+
+    // Returns flow of CoachMode for the given username (default SUPPORTIVE)
+    fun coachMode(context: Context, username: String): Flow<CoachMode> {
+        val key = stringPreferencesKey("coach_mode_$username")
+        return context.dataStore.data.map { prefs ->
+            val value = prefs[key] ?: CoachMode.SUPPORTIVE.name
+            try {
+                CoachMode.valueOf(value)
+            } catch (e: Exception) {
+                CoachMode.SUPPORTIVE
+            }
+        }
+    }
+
+    // Updates CoachMode for the given username
+    suspend fun setCoachMode(context: Context, username: String, mode: CoachMode) {
+        val key = stringPreferencesKey("coach_mode_$username")
         context.dataStore.edit { prefs ->
             prefs[key] = mode.name
         }
@@ -73,10 +95,12 @@ object SettingsStore {
         val modeKey = stringPreferencesKey("mode_$username")
         val versionKey = intPreferencesKey("consent_version_$username")
         val timeKey = stringPreferencesKey("consent_time_$username")
+        val coachKey = stringPreferencesKey("coach_mode_$username")
         context.dataStore.edit { prefs ->
             prefs.remove(modeKey)
             prefs.remove(versionKey)
             prefs.remove(timeKey)
+            prefs.remove(coachKey)
         }
     }
 }

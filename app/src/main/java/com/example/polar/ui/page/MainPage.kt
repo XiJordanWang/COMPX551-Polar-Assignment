@@ -739,23 +739,23 @@ fun DemoDataCard(username: String) {
     // True while saving, so the button can't be pressed twice
     var adding by remember { mutableStateOf(false) }
 
-    // TEMPORARY test of coach notifications
-    var testMode by remember { mutableStateOf("Mixed") }
+    // TEMPORARY test of coach notifications.
+    // Uses the coach personality the user saved in Settings.
+    val coachModeFlow = remember { SettingsStore.coachMode(context, username) }
+    val coachMode by coachModeFlow.collectAsState(initial = CoachMode.SUPPORTIVE)
     var lastMessage by remember { mutableStateOf<String?>(null) }
 
     val sendTestMessage = {
-        val mode = when (testMode) {
-            "Supportive" -> CoachMode.SUPPORTIVE
-            "Bully" -> CoachMode.BULLY
-            else -> CoachMode.MIXED
-        }
         // Any of the 3 triggers, so we can see different messages
         val trigger = CoachTrigger.entries.random()
-        val message = pickMessage(mode, trigger, Random.Default, lastMessage)
+        val message = pickMessage(coachMode, trigger, Random.Default, lastMessage)
         if (message != null) {
             CoachNotifier.showCoachMessage(context, message)
             lastMessage = message
             Toast.makeText(context, "Sent a $trigger message. Pull down the notification bar.", Toast.LENGTH_SHORT).show()
+        } else {
+            // pickMessage returns null when the mode is OFF
+            Toast.makeText(context, "Coach is Off, so no message. Change it in Settings.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -825,11 +825,10 @@ fun DemoDataCard(username: String) {
             // ---------- TEMPORARY: try a coach notification on the phone ----------
             Spacer(modifier = Modifier.height(20.dp))
             Text(text = "🔔 Test coach message", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            ChoiceRow(
-                options = listOf("Supportive", "Bully", "Mixed"),
-                selected = testMode,
-                onSelect = { testMode = it }
+            Text(
+                text = "Current mode: ${coachMode.name.lowercase().replaceFirstChar { it.uppercase() }} (change it in Settings)",
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp
             )
             Spacer(modifier = Modifier.height(12.dp))
             Button(
