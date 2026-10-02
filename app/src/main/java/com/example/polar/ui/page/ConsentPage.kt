@@ -44,11 +44,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.polar.data.db.AppDatabase
+import com.example.polar.data.entity.heartRateList
+import com.example.polar.data.online.UserTable
+import com.example.polar.data.online.WorkoutSummary
+import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.data.prefs.PrivacyMode
 import com.example.polar.data.prefs.SettingsStore
+import com.example.polar.logic.PointsCalculator
+import com.example.polar.logic.streakDays
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 const val CONSENT_VERSION = 1
@@ -123,6 +131,30 @@ fun ConsentScreen(firstName: String, username: String, lastName: String) {
                     scope.launch {
                         SettingsStore.setPrivacyMode(context, username, selectedMode)
                         SettingsStore.setConsent(context, username, CONSENT_VERSION)
+
+                        val isSharing = selectedMode == PrivacyMode.SHARE || selectedMode == PrivacyMode.FULL
+                        UserTable.setSharing(username, isSharing)
+
+                        if (isSharing) {
+                            val db = AppDatabase.getDatabase(context)
+                            val localWorkouts = db.workoutDao().getWorkouts(username).first()
+                            for (w in localWorkouts) {
+                                val summary = WorkoutSummary(
+                                    username = username,
+                                    type = w.type,
+                                    startTime = w.startTime,
+                                    durationSec = w.durationSec,
+                                    minHr = w.minHr,
+                                    avgHr = w.avgHr,
+                                    maxHr = w.maxHr,
+                                    points = PointsCalculator.calculate(w.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR)
+                                )
+                                WorkoutSummaryTable.insert(summary)
+                            }
+                            val streak = streakDays(localWorkouts)
+                            UserTable.setStreak(username, streak)
+                        }
+
                         Toast.makeText(context, "Consent accepted", Toast.LENGTH_SHORT).show()
 
                         val intent = Intent(context, MainPage::class.java).apply {
