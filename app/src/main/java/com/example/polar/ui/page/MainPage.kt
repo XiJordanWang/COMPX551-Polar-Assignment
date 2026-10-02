@@ -104,6 +104,7 @@ import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
+import com.example.polar.work.StreakReminderWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -122,6 +123,9 @@ class MainPage : ComponentActivity() {
         val firstName = intent.getStringExtra("firstName") ?: ""
         val lastName = intent.getStringExtra("lastName") ?: ""
         val username = intent.getStringExtra("username") ?: ""
+
+        // Daily streak reminder around 7pm (does nothing if it is already scheduled)
+        StreakReminderWorker.schedule(this)
 
         setContent {
             PolarTheme {
@@ -854,6 +858,26 @@ fun DemoDataCard(username: String) {
                     .height(52.dp)
             ) {
                 Text(text = "Send test coach message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            // Runs the daily streak check now, instead of waiting for 7pm
+            Button(
+                onClick = {
+                    StreakReminderWorker.runNow(context)
+                    Toast.makeText(
+                        context,
+                        "Streak check started. A message comes only if you have a streak and no workout today.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                },
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Orange),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text(text = "Run streak check now", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
