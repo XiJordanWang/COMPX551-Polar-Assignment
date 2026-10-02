@@ -1,183 +1,205 @@
 # Polar Garden — COMPX551 Assignment Four, Group 6
 
-An Android app (Kotlin + Jetpack Compose) for the **Polar H10** chest strap. Every workout earns points, and the points grow a plant on the home screen, from a seed to a flower. Users choose a sport and train with a live heart-rate chart and an intensity gauge. They can also take a 30-second resting ECG check and fill in an assessment that sets personal heart-rate zones. Past workouts appear as weekly and monthly summaries.
+An Android app (Kotlin + Jetpack Compose) for the **Polar H10** chest strap.
+Every workout earns points, and the points grow a plant on the home screen, from a seed to a flower.
+The app streams live heart rate and accelerometer data from the H10, shows it as charts, keeps a history with
+daily/weekly stats, lets users compare plants on a leaderboard, and gives privacy controls over what is stored and shared.
 
 ---
 
-## Features
+## 1. The app in one picture
+
+```
+            ┌─────────────────────────── UI (Jetpack Compose) ────────────────────────────┐
+            │ Welcome → Consent → Sign in → Home (plant) / History / Friends / Profile     │
+            │ Workout (live charts) · ECG check · Baseline · Assessment · Settings · Guide │
+            └───────────────┬───────────────────────────────┬──────────────────────────────┘
+                            │                               │
+             ┌──────────────▼─────────────┐   ┌─────────────▼──────────────┐
+             │ logic/  (pure Kotlin)       │   │ notify/  (notifications)    │
+             │ points, plant, stats, ECG,  │   │ channels, permission,       │
+             │ health, coach messages      │   │ coach messages              │
+             └──────────────┬─────────────┘   └─────────────────────────────┘
+                            │
+       ┌────────────────────▼─────────────────────── data/ ─────────────────────────────────┐
+       │ polar/   Polar BLE SDK  → live HR + accelerometer (StateFlow)                        │
+       │ DataGate privacy mode decides what is saved / uploaded                               │
+       │ db/ dao/ entity/   Room (SQLite, on the phone)                                       │
+       │ online/            Supabase (Postgres, online)                                       │
+       │ prefs/             SharedPreferences / DataStore (small settings)                    │
+       │ processing/        ECG band-pass filter                                              │
+       └─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Three layers:** `ui/` only draws, `logic/` only calculates (no Android, easy to unit test), `data/` only stores and fetches.
+
+---
+
+## 2. Features
 
 | Area | What it does |
 |---|---|
-| **Welcome** | Garden scene at sunrise. The plant loops through its growth stages to show the idea of the app. |
-| **Sign in / Sign up** | Username + password, plus first and last name when signing up. Stored in the **online** `users` table; the password is saved as a salted PBKDF2 hash. |
-| **Home (My Plant)** | The plant grows with total points through 5 stages (Seed → Sprout → Seedling → Young Plant → Blooming), with a progress bar to the next stage. Also shows the day streak, today's points, the Polar H10 card, the last workout, ECG Check and Assessment. |
-| **Profile** | Tap the avatar. Shows name and username, lets you enter or change the **Polar H10 device ID** (8 hex characters, checked and cleaned while typing), and sign out. |
-| **Workout** | Choose one of 8 sports. Live timer and current / min / avg / max heart rate. Swipe between a 60-second line chart and an intensity gauge. **Stop** saves the full workout on the phone and uploads a summary. |
-| **Personal zones** | The gauge and the points use zones based on the user's max heart rate (220 − age from the assessment). Without an assessment the app uses fixed zones. |
-| **ECG Check** | 30-second resting ECG at 130 Hz. Detects R-peaks and calculates resting heart rate. |
-| **Assessment** | Gender, age, height, weight, workouts per week, preferred intensity. Shows BMI, max heart rate, 5 zones and a target heart-rate range. Stored in the **online** `assessments` table. |
-| **History** | Minutes-per-day bar chart (week / month) with an average line, heart-rate range of the latest workout, last workout with calories (Keytel formula), list of all workouts. |
-| **Workout detail** | Duration, calories, min / avg / max, and a zoomable chart of the full session's heart rate. |
+| **Welcome** | Garden scene; the plant loops from seed to flower to explain the idea. |
+| **Consent + privacy mode** | First launch: explains what data is collected, where it is stored and who can see it. The user picks **Full**, **Share** or **Read-only**. Can be changed later on the Profile tab. |
+| **Sign in / Sign up** | Username + password (salted PBKDF2 hash) in the online `users` table. "Remember me" skips sign-in next time. |
+| **Home (My Plant)** | Plant grows with total points (Seed → Sprout → Seedling → Young Plant → Blooming). Day streak, today's points, Polar H10 card, last workout, ECG check, assessment. |
+| **Workout** | Pick 1 of 8 sports. Connects to the H10 with the saved device ID and streams HR + accelerometer. Live 60-second line chart and intensity gauge, min/avg/max. **Stop** saves it (depending on privacy mode). |
+| **Baseline** | 30-second resting heart rate measurement (first 5 s ignored, stable if max − min < 10 bpm). |
+| **ECG check** | 30-second resting ECG, R-peak detection → resting heart rate. Saved to history. |
+| **Assessment** | Gender, age, height, weight, activity, preferred intensity → BMI, max HR, personal zones, target range. |
+| **History** | Three sub-tabs: **Overview** (week-over-week change, daily bars with 7-day rolling mean, streak, personal bests), **Trends** (weekly trends, ECG resting-HR trend), **Sessions** (all workouts and ECG checks). Workout detail page with a zoomable chart. |
+| **Friends (leaderboard)** | Podium + ranked list of everyone who shares, with their plant, points and streak. |
+| **Profile** | Name, H10 device ID, privacy mode, settings (baseline, H10 guide), export to CSV, delete my data, log out. |
+| **Coach (in progress)** | Message pools for Supportive / Bully / Mixed / Off, notification channels, Android 13+ permission. Test button in debug builds. |
+| **Demo data (debug only)** | Generates workouts in all 8 sports worth exactly 5000 points, for testing without the H10. |
 
 ---
 
-## Tech stack
+## 3. Where data is stored
 
-- **Kotlin**, **Jetpack Compose** (Material 3), single-module app, `minSdk 24`
-- **Room** (SQLite, with KSP): local data; **Flow** for screens that update automatically
-- **Supabase** (Postgres) with `supabase-kt` 3.2.6 (Postgrest + Ktor): online data
-- **Apache ECharts 5.6** in a `WebView` (bundled in `assets/`, works offline)
-- **Compose Canvas** for the plant and the garden background (no image files)
-- **Polar BLE SDK**: handled by the device team
-
----
-
-## Where data is stored
-
-We split the data on purpose: data that has to follow the user or be compared with other users goes online; big or private data stays on the phone.
-
-| Data | Where | Why |
+| Data | Where | Why there |
 |---|---|---|
-| Users (username, name, password hash) | **Online** — `users` | Sign in from any phone |
-| Assessments | **Online** — `assessments` | Follows the user; needed for zones and calories |
-| Workout summaries (type, time, duration, min/avg/max HR, points) | **Online** — `workout_summaries` | Comparing users / leaderboard |
-| Full workouts (heart rate of every second) | **Phone** — Room `workouts` | Large and private health data (data sovereignty) |
-| Polar H10 device ID | **Phone** — Room `devices` | Belongs to this phone and chest strap |
+| Full workouts (one HR value per second) | **Room** `workouts` | Large, private health data stays on the phone |
+| Polar H10 device ID | **Room** `devices` | Belongs to this phone and strap |
+| Resting baseline | **Room** `baselines` | Measured on this phone |
+| ECG checks (with samples) | **Room** `ecg_checks` | Large and private |
+| Users (name, password hash, sharing, streak) | **Supabase** `users` | Sign in from any phone |
+| Assessments | **Supabase** `assessments` | Follows the user |
+| Workout summaries (no raw HR) | **Supabase** `workout_summaries` | Leaderboard |
+| Leaderboard | **Supabase view** `leaderboard` | `users LEFT JOIN workout_summaries`, only users with `sharing = true` |
+| Logged-in user | SharedPreferences `user_session` | One small value |
+| Privacy mode, consent version/time | DataStore `user_settings` | Small per-user settings |
+| "Notification permission asked" | SharedPreferences `notifications` | One flag |
 
-### Online tables (Supabase / Postgres)
+### Privacy modes (`data/DataGate.kt`)
 
-Created by [`supabase/schema.sql`](supabase/schema.sql):
+| Mode | Workout | ECG | Assessment | Leaderboard |
+|---|---|---|---|---|
+| **Full** | phone + summary online | phone | online | yes |
+| **Share** | phone + summary online | phone | online | yes |
+| **Read-only** | **not saved at all** | not saved | not saved | no |
 
-- `users` — primary key `username`, columns `first_name`, `last_name`, `password_hash`, `created_at`
-- `assessments` — primary key `username` (foreign key → `users`), gender, age, height, weight, workouts per week, intensity
-- `workout_summaries` — `id` (identity), `username` (foreign key → `users`), type, start time, duration, min/avg/max HR, points
+### Local tables (Room, database version 7)
 
-### Local tables (Room, database version 5)
+```
+workouts    id PK · username · type · startTime · durationSec · minHr · avgHr · maxHr · heartRates (CSV)
+devices     username PK · deviceId
+baselines   username PK · baselineHr · createdAt
+ecg_checks  id PK · username · time · restingHr · samples (CSV)
+```
 
-- `workouts` — id, username, type, startTime, durationSec, min/avg/max HR, `heartRates` (one bpm per second, comma-separated)
-- `devices` — primary key `username`, `deviceId`
+Migrations: 1→2 destructive (no real users yet); 2→3, 3→4 add tables; 4→5 moves users/assessments online and adds `devices`;
+5→6 adds `baselines`; 6→7 adds `ecg_checks`. Existing workouts are kept.
 
-Migrations: v1→v2 destructive (no real users yet); v2→v3 and v3→v4 add tables; **v4→v5** drops the local `users` and `assessments` tables (now online) and adds `devices`. Workouts are kept.
+### Online tables (Supabase / Postgres) — created by [`supabase/schema.sql`](supabase/schema.sql)
+
+```
+users              username PK · first_name · last_name · password_hash · sharing · streak · created_at
+assessments        username PK/FK → users · gender · age · height_cm · weight_kg · workouts_per_week · intensity
+workout_summaries  id PK · username FK → users · type · start_time · duration_sec · min_hr · avg_hr · max_hr · points
+leaderboard (view) username · first_name · total_points · workouts · streak
+```
+
+Foreign keys use `on delete cascade`. [`supabase/seed_demo.sql`](supabase/seed_demo.sql) adds 5 demo users (`demo_*`, password `demo1234`).
 
 ---
 
-## Project structure
+## 4. Main data flows
 
+**A workout**
 ```
-app/src/main/
-├── java/com/example/polar/
-│   ├── MainActivity.kt              Welcome screen → SignPage
-│   ├── data/                        Storage only (no UI)
-│   │   ├── db/AppDatabase.kt        Room database (v5) + migrations
-│   │   ├── entity/                  Local tables: Workout, Device
-│   │   ├── dao/                     Local queries: WorkoutDao (Flow), DeviceDao (@Upsert, Flow)
-│   │   ├── online/                  Online database (Supabase)
-│   │   │   ├── Supabase.kt          The connection (address + key from local.properties)
-│   │   │   ├── User.kt, Assessment.kt, WorkoutSummary.kt   Rows (@Serializable)
-│   │   │   └── UserTable.kt, AssessmentTable.kt, WorkoutSummaryTable.kt   select / insert / upsert
-│   │   ├── model/WorkoutType.kt     List of sports + emoji (not a table)
-│   │   └── processing/filter_ecg.kt ECG band-pass filter (0.5–40 Hz)
-│   ├── logic/                       Pure functions (no UI, no database), easy to unit test
-│   │   ├── Health.kt                BMI, max HR, zone limits, calories (Keytel)
-│   │   ├── Plant.kt                 Plant stages, points per workout, today's points
-│   │   ├── Ecg.kt                   R-peak detection → BPM, simulated ECG signal
-│   │   ├── History.kt               Minutes per day, day labels, day streak
-│   │   ├── Password.kt              Salted PBKDF2 hash + check
-│   │   ├── Device.kt                Device ID check and clean-up
-│   │   └── Format.kt                "1 hr 20 min", "01:15"
-│   └── ui/
-│       ├── page/
-│       │   ├── SignPage.kt          Sign in / sign up
-│       │   ├── MainPage.kt          Home, profile, bottom bar, workout picker
-│       │   ├── HistoryTab.kt        History tab cards
-│       │   ├── WorkoutPage.kt       Live workout (pager: line chart / gauge)
-│       │   ├── WorkoutDetailPage.kt One past workout, zoomable chart
-│       │   ├── EcgPage.kt           30 s resting ECG screen
-│       │   ├── AssessmentPage.kt    Assessment form + results
-│       │   ├── PlantView.kt         The plant (Canvas) and the plant card
-│       │   ├── GardenBackground.kt  Sky, sun, clouds and hills (Canvas)
-│       │   └── EChartsView.kt       Reusable WebView wrapper for ECharts
-│       └── theme/                   Colours, fonts, Material theme
-└── assets/                          ECharts pages
-    ├── echarts.min.js
-    ├── line_chart.html              Live HR, last 60 s
-    ├── gauge.html                   Intensity gauge with personal zones
-    ├── ecg.html                     ECG waveform, last 3 s
-    ├── week_bars.html               Minutes per day + average line
-    ├── hr_range.html                Floating min–max bars
-    └── history_chart.html           Full-session HR with dataZoom
-supabase/schema.sql                  Creates the online tables
+Polar H10 ─BLE─► PolarManager (StateFlow<SensorData>) ─► WorkoutPage: heartRates list
+   every second ─► min/avg/max, zone ─► ECharts (evaluateJavascript)
+   Stop ─► DataGate.saveWorkout ─► Room workouts  (+ Supabase summary, streak, sharing if Share/Full)
+         ─► Room Flow ─► Home recalculates points ─► plant grows
 ```
 
-### How data flows
+**Points** (`logic/PointsCalculator.kt`)
+For every second: HR − baseline < 10 → 0; 10–19 → 1; 20–29 → 2; ≥ 30 → 3. Sum ÷ 10 (= points per 10 seconds).
+Baseline is currently a fixed **70 bpm**. One minute of hard exercise = 18 points; a 30-minute workout ≈ 500.
+Home points are **recalculated** from local workouts; leaderboard points are **stored** per upload.
+
+**Sign in** — `UserTable.findByUsername` → `checkPassword(salted PBKDF2)` → `SessionStore.saveUser` → consent check → Home.
+
+---
+
+## 5. Project structure (who wrote what)
+
+Main authors from `git blame`. **Xi** = Xi Wang · **Caitlin** · **Chathurangi** · **Shreyaa**.
 
 ```
-(Polar H10 → SDK)  ──►  WorkoutPage: heartRates list (Compose state)
-                             │  every second
-                             ├─► min / avg / max, zone  ──► ECharts (evaluateJavascript)
-                             └─► Stop ─┬─► full Workout ──► Room (phone)
-                                       │                      │  Flow
-                                       │                      ▼
-                                       │        MainPage / HistoryTab / plant update by themselves
-                                       └─► WorkoutSummary ──► Supabase (online)
+com.example.polar
+├── MainActivity.kt                 Welcome, notification channels, auto sign-in, consent check   Xi, Caitlin
+├── data/
+│   ├── DataGate.kt                 Privacy mode → what to save/upload                             Caitlin
+│   ├── db/AppDatabase.kt           Room database v7 + migrations                                 Xi, Chathurangi
+│   ├── entity/ dao/                Workout, Device (Xi) · Baseline (Chathurangi) · EcgCheck (Caitlin)
+│   ├── online/                     Supabase client, users/assessments/summaries/leaderboard      Xi, Caitlin
+│   ├── polar/                      PolarManager, SensorData, SensorRepository (BLE SDK)          Chathurangi
+│   ├── prefs/                      SessionStore, SettingsStore (privacy + consent)               Caitlin
+│   ├── model/WorkoutType.kt        8 sports + emoji                                              Xi
+│   └── processing/filter_ecg.kt    ECG band-pass filter 0.5–40 Hz                                 Shreyaa
+├── logic/                          Pure functions, unit tested
+│   ├── PointsCalculator.kt         Baseline-relative points                                       Xi
+│   ├── Plant.kt                    Plant stages, total/today points                               Xi
+│   ├── History.kt                  Daily/weekly stats, streak, rolling mean, personal bests        Caitlin, Xi
+│   ├── Coach.kt                    Coach modes, triggers, message pools, pickMessage()            Xi
+│   ├── Health.kt                   BMI, max HR, zones, Keytel calories                            Xi
+│   ├── Ecg.kt                      R-peak detection, simulated ECG                                Xi
+│   ├── Password.kt                 Salted PBKDF2 hash/check                                       Xi
+│   ├── DemoData.kt                 5000-point demo workouts                                       Xi
+│   └── Device.kt, Format.kt        Device ID check, time formatting                               Xi
+├── notify/CoachNotifier.kt         Channels, permission, showCoachMessage()                       Xi
+└── ui/page/
+    ├── SignPage, MainPage          Sign in/up · Home, Profile, bottom bar, workout picker         Xi (+ Caitlin: export/delete/privacy)
+    ├── WorkoutPage                 Live workout + Polar connection                                Xi, Chathurangi
+    ├── HistoryTab                  Overview / Trends / Sessions                                   Caitlin, Xi
+    ├── SocialTab                   Leaderboard                                                    Xi, Caitlin
+    ├── EcgPage, AssessmentPage, WorkoutDetailPage                                                 Xi (+ Caitlin: save ECG)
+    ├── BaselinePage, SettingsPage, H10GuidePage                                                   Chathurangi
+    ├── ConsentPage, PrivacyModePicker                                                             Caitlin
+    ├── PlantView, GardenBackground Plant and garden drawn with Canvas                             Xi
+    └── EChartsView                 WebView wrapper for ECharts                                    Xi
+assets/                             ECharts pages (line, gauge, ECG, week bars, HR range, history)
+supabase/                           schema.sql, seed_demo.sql
+app/src/test/                       PointsCalculatorTest (9), DemoDataTest (5), CoachTest (7)
 ```
 
 ---
 
-## Processing
+## 6. Build, run and test
 
-- **Session statistics**: min, average and max heart rate over the whole workout.
-- **Zone classification**: each heart rate is put into Rest / Light / Moderate / Hard / Maximum using 50/60/70/80 % of max heart rate (220 − age).
-- **Points**: per minute, 0 / 1 / 2 / 3 points for Rest / Light / Moderate / Hard+, plus a bonus of 20 for a 30-minute workout. *(Placeholder rule, to be replaced by the baseline-based algorithm.)*
-- **Streak**: consecutive days with at least one workout. If there's no workout today yet, the streak still counts up to yesterday.
-- **ECG filtering**: 0.5 Hz high-pass (removes baseline drift) + 40 Hz low-pass (removes noise).
-- **R-peak detection** (ECG): a sample crossing 500 µV upwards counts as a beat. BPM = (peaks − 1) / time between the first and last peak × 60.
-- **Calories**: Keytel et al. (2005). Separate male and female equations using heart rate, weight and age.
-- **Daily aggregation**: workout seconds are grouped into calendar days for the week and month charts.
-
-## Visualisation choices
-
-- **The plant**: a non-chart visualisation of total progress. It grows a little with every point and changes shape at each stage.
-- **Live line chart (last 60 s)**: easy to read at a glance during exercise. No zoom, so it doesn't clash with the swipe gesture.
-- **Gauge**: shows at once "how hard am I working", coloured by personal zone.
-- **ECG waveform**: uses an ECG-paper grid, and animation is off so the 10 Hz updates stay sharp.
-- **Floating range bars**: show how much heart rate varied in each part of the workout.
-- **Zoomable area chart**: only used for past workouts, where the user has time to explore.
-
----
-
-## Build & run
-
-1. **Supabase**: create a project at supabase.com, open **SQL Editor**, paste [`supabase/schema.sql`](supabase/schema.sql) and click **Run**.
-2. In Supabase **Project Settings → API**, copy the **Project URL** and the **anon public** key, and add them to `local.properties` (this file is not in git):
+1. Supabase: run [`supabase/schema.sql`](supabase/schema.sql) in the SQL Editor (optional: [`seed_demo.sql`](supabase/seed_demo.sql)).
+2. Add the project URL and publishable key to `local.properties` (not in git):
    ```
    supabase.url=https://xxxx.supabase.co
-   supabase.key=eyJhbGci...
+   supabase.key=sb_publishable_...
    ```
-3. Open the project in Android Studio (AGP 9, Kotlin 2.2, JDK 11+), sync Gradle, and run `app` on a phone (API 24+).
-4. Sign up, set your Polar H10 device ID on the Profile tab (tap the avatar), then start a workout with the orange button.
+3. Run `app` from Android Studio on a phone (API 24+). Allow Bluetooth (and notifications on Android 13+).
+4. Profile tab → enter the H10 device ID (8 hex characters, printed on the sensor) → start a workout.
 
 ```bash
-./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest
 ```
 
-## Known limitations
+**Looking at the data:** local Room → Android Studio **App Inspection → Database Inspector** (live).
+Supabase → DataGrip (PostgreSQL, Session pooler, SSL require) or the Supabase Table Editor.
 
-- Sensor data is simulated until the Polar SDK is connected.
-- The app uses the Supabase **anon** key with open table policies. A real app would use Supabase Auth and let each user read and write only their own rows.
-- Without internet, users can't sign in or save the assessment. Workouts are still saved on the phone, but their summary isn't uploaded.
-- The login session is not remembered, and user info is passed between screens with Intent extras.
-- Pressing system Back during a workout discards it; only **Stop** saves.
-- The ECG R-peak threshold is a fixed number (500 µV).
+---
 
-## Roadmap
+## 7. Known limitations (honest list)
 
-1. Polar BLE SDK: connect using the saved device ID; stream HR, RR intervals, accelerometer and ECG; handle permissions and reconnection.
-2. Baseline-based points (heart-rate reserve from the 30 s resting baseline), using the accelerometer to check the user is really moving.
-3. Leaderboard from `workout_summaries` (total points per user).
-4. HRV (RMSSD / SDNN) from RR intervals, with artifact filtering.
-5. Adaptive ECG peak detection (Pan–Tompkins).
+- **Points use a fixed baseline of 70 bpm.** The measured baseline (`baselines` table) is shown in Settings but not used for points yet.
+- **Repeated equal HR values are lost:** `WorkoutPage` adds HR in `LaunchedEffect(sensorData.heartRate)`, and a `StateFlow` does not emit the same value twice, so a steady heart rate records fewer seconds.
+- **The ECG band-pass filter (`filter_ecg.kt`) is not called anywhere yet**, and has no `package` line.
+- **No foreground service:** the workout only records while the workout screen is open.
+- **Coach is partly done:** messages, channels and permission exist; the inactivity detector, the mode picker in Settings and the WorkManager streak reminder are not built.
+- **Demo data button writes directly to Room**, so it ignores the privacy mode (debug builds only).
+- Supabase uses the publishable key with open table policies; a real app would use Supabase Auth + row-level security per user.
+- Without internet: sign-in and assessments don't work; workouts are still saved locally.
+
+---
 
 ## Team
 
-Group 6 — COMPX551-26B, University of Waikato.
+Group 6 — COMPX551-26B, University of Waikato: Xi Wang, Caitlin, Chathurangi Nilushika, Shreyaa.
