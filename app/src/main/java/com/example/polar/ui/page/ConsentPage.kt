@@ -136,6 +136,8 @@ fun ConsentScreen(firstName: String, username: String, lastName: String) {
                         UserTable.setSharing(username, isSharing)
 
                         if (isSharing) {
+                            // Clear old online summaries first to prevent duplicate rows
+                            WorkoutSummaryTable.deleteForUser(username)
                             val db = AppDatabase.getDatabase(context)
                             val localWorkouts = db.workoutDao().getWorkouts(username).first()
                             for (w in localWorkouts) {

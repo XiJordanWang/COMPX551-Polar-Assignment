@@ -523,7 +523,8 @@ fun ProfileContent(
                             WorkoutSummaryTable.deleteForUser(username)
                             Toast.makeText(context, "Privacy mode updated. Online summaries cleared.", Toast.LENGTH_SHORT).show()
                         } else {
-                            // Upload past workouts if any exist locally
+                            // Clear old online summaries first to prevent duplicate rows
+                            WorkoutSummaryTable.deleteForUser(username)
                             val localWorkouts = db.workoutDao().getWorkouts(username).first()
                             var uploaded = 0
                             for (w in localWorkouts) {
