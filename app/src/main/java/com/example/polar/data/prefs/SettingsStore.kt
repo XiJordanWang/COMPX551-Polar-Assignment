@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.polar.logic.CoachMode
+import com.example.polar.logic.DEFAULT_STYLE_ID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -63,6 +64,22 @@ object SettingsStore {
         }
     }
 
+    // Returns flow of the chosen plant style id for the given username (default "classic")
+    fun plantStyle(context: Context, username: String): Flow<String> {
+        val key = stringPreferencesKey("plant_style_$username")
+        return context.dataStore.data.map { prefs ->
+            prefs[key] ?: DEFAULT_STYLE_ID
+        }
+    }
+
+    // Updates the chosen plant style for the given username
+    suspend fun setPlantStyle(context: Context, username: String, styleId: String) {
+        val key = stringPreferencesKey("plant_style_$username")
+        context.dataStore.edit { prefs ->
+            prefs[key] = styleId
+        }
+    }
+
     // Returns flow of consent version for the given username
     fun consentVersion(context: Context, username: String): Flow<Int> {
         val key = intPreferencesKey("consent_version_$username")
@@ -96,11 +113,13 @@ object SettingsStore {
         val versionKey = intPreferencesKey("consent_version_$username")
         val timeKey = stringPreferencesKey("consent_time_$username")
         val coachKey = stringPreferencesKey("coach_mode_$username")
+        val styleKey = stringPreferencesKey("plant_style_$username")
         context.dataStore.edit { prefs ->
             prefs.remove(modeKey)
             prefs.remove(versionKey)
             prefs.remove(timeKey)
             prefs.remove(coachKey)
+            prefs.remove(styleKey)
         }
     }
 }

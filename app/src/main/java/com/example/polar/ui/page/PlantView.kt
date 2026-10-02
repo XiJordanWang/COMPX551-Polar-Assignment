@@ -31,7 +31,9 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.polar.logic.PlantStyle
 import com.example.polar.logic.plantStages
+import com.example.polar.logic.plantStyles
 import com.example.polar.logic.progressToNextStage
 import com.example.polar.logic.stageIndexFor
 import com.example.polar.ui.theme.Orange
@@ -39,17 +41,14 @@ import com.example.polar.ui.theme.WorkSans
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val PotColor = Color(0xFFE07A5F)
-private val RimColor = Color(0xFFC8553D)
+// Pot, stem, leaf and petal colours come from the PlantStyle (logic/PlantStyles.kt).
+// These two are the same for every style.
 private val SoilColor = Color(0xFF6D4C41)
-private val StemColor = Color(0xFF3E8E41)
-private val LeafColor = Color(0xFF6BCB77)
-private val PetalColor = Color(0xFFFF8FAB)
 private val FlowerCenter = Color(0xFFFFD166)
 
 // Big card on the home page: the plant, its stage and how many points to the next stage
 @Composable
-fun PlantCard(points: Int) {
+fun PlantCard(points: Int, style: PlantStyle = plantStyles.first()) {
     val stageIndex = stageIndexFor(points)
     val stage = plantStages[stageIndex]
     val progress = progressToNextStage(points)
@@ -60,7 +59,7 @@ fun PlantCard(points: Int) {
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            PlantImage(stageIndex = stageIndex, progress = progress, modifier = Modifier.size(230.dp))
+            PlantImage(stageIndex = stageIndex, progress = progress, modifier = Modifier.size(230.dp), style = style)
 
             Text(
                 text = stage.name,
@@ -105,7 +104,12 @@ fun PlantCard(points: Int) {
 // TODO: when we have the Figma images, replace the Canvas with
 // Image(painter = painterResource(plantImages[stageIndex]), ...)
 @Composable
-fun PlantImage(stageIndex: Int, progress: Float, modifier: Modifier = Modifier) {
+fun PlantImage(
+    stageIndex: Int,
+    progress: Float,
+    modifier: Modifier = Modifier,
+    style: PlantStyle = plantStyles.first()
+) {
     // 0.0 = seed, 1.0 = fully grown. Grows a little with every point, not only at each new stage.
     val lastStage = plantStages.size - 1
     val target = ((stageIndex + progress) / lastStage).coerceIn(0f, 1f)
@@ -136,13 +140,13 @@ fun PlantImage(stageIndex: Int, progress: Float, modifier: Modifier = Modifier) 
             lineTo(centerX - potBottomHalf, potBottom)
             close()
         }
-        drawPath(pot, PotColor)
+        drawPath(pot, Color(style.potColor))
 
         // Rim
         val rimHeight = h * 0.06f
         val rimHalf = potTopHalf * 1.12f
         drawRoundRect(
-            color = RimColor,
+            color = Color(style.rimColor),
             topLeft = Offset(centerX - rimHalf, potTop - rimHeight),
             size = Size(rimHalf * 2, rimHeight),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f)
@@ -172,7 +176,7 @@ fun PlantImage(stageIndex: Int, progress: Float, modifier: Modifier = Modifier) 
             } else {
                 val stemHeight = h * 0.55f * growth
                 val stemTop = Offset(centerX, soilY - stemHeight)
-                drawLine(StemColor, stemBase, stemTop, strokeWidth = w * 0.025f, cap = StrokeCap.Round)
+                drawLine(Color(style.stemColor), stemBase, stemTop, strokeWidth = w * 0.025f, cap = StrokeCap.Round)
 
                 // More pairs of leaves at higher stages (1, 2 or 3 pairs)
                 val pairs = minOf(stageIndex, 3)
@@ -181,13 +185,13 @@ fun PlantImage(stageIndex: Int, progress: Float, modifier: Modifier = Modifier) 
                     // Spread the pairs along the stem, from the top down
                     val along = 0.9f - i * 0.28f
                     val point = Offset(centerX, soilY - stemHeight * along)
-                    drawLeaf(point, leafLength, angleDegrees = -150f)
-                    drawLeaf(point, leafLength, angleDegrees = -30f)
+                    drawLeaf(point, leafLength, angleDegrees = -150f, color = Color(style.leafColor))
+                    drawLeaf(point, leafLength, angleDegrees = -30f, color = Color(style.leafColor))
                 }
 
                 // Flower on top when fully grown
                 if (stageIndex == plantStages.size - 1) {
-                    drawFlower(stemTop, w * 0.05f)
+                    drawFlower(stemTop, w * 0.05f, Color(style.petalColor))
                 }
             }
         }
@@ -225,7 +229,7 @@ private fun DrawScope.drawFace(centerX: Float, eyeY: Float, w: Float) {
 }
 
 // A leaf shape: two curves from the base to the tip
-private fun DrawScope.drawLeaf(base: Offset, length: Float, angleDegrees: Float) {
+private fun DrawScope.drawLeaf(base: Offset, length: Float, angleDegrees: Float, color: Color) {
     val angle = Math.toRadians(angleDegrees.toDouble())
     val tip = Offset(base.x + length * cos(angle).toFloat(), base.y + length * sin(angle).toFloat())
     val middle = Offset((base.x + tip.x) / 2, (base.y + tip.y) / 2)
@@ -239,18 +243,18 @@ private fun DrawScope.drawLeaf(base: Offset, length: Float, angleDegrees: Float)
         quadraticTo(middle.x - side.x, middle.y - side.y, base.x, base.y)
         close()
     }
-    drawPath(leaf, LeafColor)
+    drawPath(leaf, color)
 }
 
 // Six petals around a yellow centre
-private fun DrawScope.drawFlower(center: Offset, radius: Float) {
+private fun DrawScope.drawFlower(center: Offset, radius: Float, petalColor: Color) {
     for (i in 0 until 6) {
         val angle = Math.toRadians(i * 60.0)
         val petal = Offset(
             center.x + radius * 1.1f * cos(angle).toFloat(),
             center.y + radius * 1.1f * sin(angle).toFloat()
         )
-        drawCircle(PetalColor, radius, petal)
+        drawCircle(petalColor, radius, petal)
     }
     drawCircle(FlowerCenter, radius * 0.8f, center)
 }

@@ -89,6 +89,7 @@ import com.example.polar.data.prefs.SessionStore
 import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.CoachMode
 import com.example.polar.logic.CoachTrigger
+import com.example.polar.logic.DEFAULT_STYLE_ID
 import com.example.polar.logic.DEMO_TARGET_POINTS
 import com.example.polar.logic.PointsCalculator
 import com.example.polar.logic.cleanDeviceIdInput
@@ -99,6 +100,7 @@ import com.example.polar.logic.pickMessage
 import com.example.polar.logic.streakDays
 import com.example.polar.logic.todayPoints
 import com.example.polar.logic.totalPoints
+import com.example.polar.logic.usableStyle
 import com.example.polar.notify.CoachNotifier
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
@@ -332,15 +334,26 @@ fun HomeContent(
     val today = remember(workouts) { todayPoints(workouts, baseline) }
     val streak = remember(workouts) { streakDays(workouts) }
 
+    // Plant style chosen in the shop (saved in SettingsStore). Classic if it isn't unlocked.
+    val scope = rememberCoroutineScope()
+    val savedStyleId by remember { SettingsStore.plantStyle(context, username) }.collectAsState(initial = DEFAULT_STYLE_ID)
+    val style = usableStyle(savedStyleId, points)
+
     Spacer(modifier = Modifier.height(8.dp))
 
-    PlantCard(points = points)
+    PlantCard(points = points, style = style)
 
     Spacer(modifier = Modifier.height(12.dp))
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         StatCard(label = "🔥 Streak", value = "$streak", unit = if (streak == 1) "day" else "days", modifier = Modifier.weight(1f))
         StatCard(label = "⭐ Today", value = "$today", unit = "pts", modifier = Modifier.weight(1f))
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    ShopCard(totalPoints = points, chosenStyleId = style.id) { styleId ->
+        scope.launch { SettingsStore.setPlantStyle(context, username, styleId) }
     }
 
     Spacer(modifier = Modifier.height(12.dp))
