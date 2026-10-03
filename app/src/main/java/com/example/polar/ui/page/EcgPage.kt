@@ -54,7 +54,7 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 // How long one ECG reading takes
-const val ECG_SECONDS = 30
+private const val ECG_SECONDS = 30
 
 class EcgPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

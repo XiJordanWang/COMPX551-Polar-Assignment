@@ -69,6 +69,7 @@ import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import com.example.polar.data.polar.SharedPolarManager
 
 class WorkoutPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,16 +92,19 @@ class WorkoutPage : ComponentActivity() {
 fun WorkoutScreen(workoutType: String, username: String) {
     val context = LocalContext.current
     val polarManager = remember {
-        PolarManager(context)
+        SharedPolarManager.polarManager
+            ?: PolarManager(context).also {
+                SharedPolarManager.polarManager = it
+            }
     }
     val db = remember {
         AppDatabase.getDatabase(context)
     }
 
-    val deviceIdFlow = remember {
-        db.deviceDao().observeDeviceId(username)
-    }
-    val deviceId by deviceIdFlow.collectAsState(initial = null)
+//    val deviceIdFlow = remember {
+//        db.deviceDao().observeDeviceId(username)
+//    }
+//    val deviceId by deviceIdFlow.collectAsState(initial = null)
     val sensorData by polarManager.sensorData.collectAsState() //hr values from polar
     // Foreground service: keeps the app alive with the screen off while this page is open.
     // Stopped when the page closes (Stop button or back), see WorkoutService.kt
@@ -111,54 +115,54 @@ fun WorkoutScreen(workoutType: String, username: String) {
     // Coach: sends a message if heart rate stays near the resting baseline (see InactivityCoach.kt)
     InactivityCoach(username = username, sensorData = polarManager.sensorData)
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val allGranted = permissions.values.all { it }
-        if (allGranted && !deviceId.isNullOrBlank()) {
-            Log.d("POLAR", "Permissions granted, connecting to $deviceId")
-            polarManager.connect(deviceId!!)
-        } else {
-            Log.w("POLAR", "Bluetooth permissions denied or deviceId is blank")
-        }
-    }
+//    val permissionLauncher = rememberLauncherForActivityResult(
+//        contract = ActivityResultContracts.RequestMultiplePermissions()
+//    ) { permissions ->
+//        val allGranted = permissions.values.all { it }
+//        if (allGranted && !deviceId.isNullOrBlank()) {
+//            Log.d("POLAR", "Permissions granted, connecting to $deviceId")
+//            polarManager.connect(deviceId!!)
+//        } else {
+//            Log.w("POLAR", "Bluetooth permissions denied or deviceId is blank")
+//        }
+//    }
 
-    LaunchedEffect(deviceId) {
-        Log.d("POLAR", "Device ID from database: $deviceId")
+//    LaunchedEffect(deviceId) {
+//        Log.d("POLAR", "Device ID from database: $deviceId")
+//
+//        if (!deviceId.isNullOrBlank()) {
+//            val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+//                arrayOf(
+//                    Manifest.permission.BLUETOOTH_SCAN,
+//                    Manifest.permission.BLUETOOTH_CONNECT
+//                )
+//            } else {
+//                arrayOf(
+//                    Manifest.permission.ACCESS_FINE_LOCATION,
+//                    Manifest.permission.ACCESS_COARSE_LOCATION
+//                )
+//            }
+//
+//            val hasPermissions = permissionsToRequest.all {
+//                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+//            }
+//
+//            if (hasPermissions) {
+//                Log.d("POLAR", "Has permissions, trying to connect to $deviceId")
+//                polarManager.connect(deviceId!!)
+//            } else {
+//                Log.d("POLAR", "Requesting bluetooth permissions for $deviceId")
+//                permissionLauncher.launch(permissionsToRequest)
+//            }
+//        }
+//    }
 
-        if (!deviceId.isNullOrBlank()) {
-            val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                )
-            } else {
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            }
-
-            val hasPermissions = permissionsToRequest.all {
-                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-            }
-
-            if (hasPermissions) {
-                Log.d("POLAR", "Has permissions, trying to connect to $deviceId")
-                polarManager.connect(deviceId!!)
-            } else {
-                Log.d("POLAR", "Requesting bluetooth permissions for $deviceId")
-                permissionLauncher.launch(permissionsToRequest)
-            }
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            Log.d("POLAR", "WorkoutScreen disposed, disconnecting")
-            polarManager.disconnect(deviceId)
-        }
-    }
+//    DisposableEffect(Unit) {
+//        onDispose {
+//            Log.d("POLAR", "WorkoutScreen disposed, disconnecting")
+//            polarManager.disconnect(deviceId)
+//        }
+//    }
 
     // 200 gives the default zones (100 / 120 / 140 / 160).
     // If the user did the assessment, use 220 - age instead.

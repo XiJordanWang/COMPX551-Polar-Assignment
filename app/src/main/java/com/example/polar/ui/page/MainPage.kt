@@ -115,6 +115,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.random.Random
+import com.example.polar.data.polar.PolarManager
+import android.util.Log
+import com.example.polar.data.polar.SharedPolarManager
 
 class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -152,6 +155,13 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
     var tab by remember { mutableStateOf("home") }
 
     val context = LocalContext.current
+
+    val polarManager = remember {
+
+        SharedPolarManager.polarManager ?: PolarManager(context).also {
+            SharedPolarManager.polarManager = it
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -194,6 +204,19 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
     val deviceIdFlow = remember { db.deviceDao().observeDeviceId(username) }
     val workouts by workoutsFlow.collectAsState(initial = emptyList())
     val deviceId by deviceIdFlow.collectAsState(initial = null)
+
+    LaunchedEffect(deviceId) {
+
+        if (!deviceId.isNullOrBlank()) {
+
+            Log.d(
+                "POLAR",
+                "MainPage connecting to $deviceId"
+            )
+
+            polarManager.connect(deviceId!!)
+        }
+    }
 
     // Online data (Supabase): the assessment. Online tables don't update by themselves,
     // so we load it again every time this page comes back (resumeCount changes).
