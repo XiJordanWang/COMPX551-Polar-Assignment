@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -89,6 +90,8 @@ import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.data.prefs.PrivacyMode
 import com.example.polar.data.prefs.SessionStore
 import com.example.polar.data.prefs.SettingsStore
+import com.example.polar.data.prefs.description
+import com.example.polar.data.prefs.title
 import com.example.polar.logic.CoachMode
 import com.example.polar.logic.CoachTrigger
 import com.example.polar.logic.DEFAULT_STYLE_ID
@@ -451,68 +454,17 @@ fun StatCard(label: String, value: String, unit: String, modifier: Modifier = Mo
 }
 
 @Composable
-fun ProfileContent(
+fun ColumnScope.ProfileContent(
     firstName: String,
     lastName: String,
     username: String,
     deviceId: String?
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val db = remember { AppDatabase.getDatabase(context) }
-
-    val modeFlow = remember { SettingsStore.privacyMode(context, username) }
-    val currentMode by modeFlow.collectAsState(initial = PrivacyMode.FULL)
-
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var deleteAccountToo by remember { mutableStateOf(false) }
-
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        if (uri != null) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val workouts = db.workoutDao().getWorkouts(username).first()
-                    val ecgChecks = db.ecgDao().getChecks(username).first()
-
-                    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
-                    val sb = StringBuilder()
-
-                    sb.append("=== WORKOUT SESSIONS ===\n")
-                    sb.append("ID,Type,Start Time,Duration (sec),Min HR,Avg HR,Max HR,Heart Rates\n")
-                    for (w in workouts) {
-                        val dateStr = dateFormat.format(Date(w.startTime))
-                        val hrString = "\"${w.heartRates}\""
-                        sb.append("${w.id},\"${w.type}\",$dateStr,${w.durationSec},${w.minHr},${w.avgHr},${w.maxHr},$hrString\n")
-                    }
-
-                    sb.append("\n=== ECG CHECKS ===\n")
-                    sb.append("ID,Time,Resting HR,Samples\n")
-                    for (ecg in ecgChecks) {
-                        val dateStr = dateFormat.format(Date(ecg.time))
-                        val sampleString = "\"${ecg.samples}\""
-                        sb.append("${ecg.id},$dateStr,${ecg.restingHr},$sampleString\n")
-                    }
-
-                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                        outputStream.write(sb.toString().toByteArray(Charsets.UTF_8))
-                    }
-
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Data exported successfully", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Export failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-        }
-    }
 
     Spacer(modifier = Modifier.height(8.dp))
 
+    // 1. User Identity Card
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Text(text = "Name", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
@@ -523,59 +475,9 @@ fun ProfileContent(
         }
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(16.dp))
 
-    // Privacy Mode Card
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            Text(text = "🔒 Privacy Mode", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            PrivacyModePicker(
-                selected = currentMode,
-                onSelect = { newMode ->
-                    scope.launch {
-                        SettingsStore.setPrivacyMode(context, username, newMode)
-                        val isSharing = newMode == PrivacyMode.SHARE
-                        UserTable.setSharing(username, isSharing)
-
-                        if (!isSharing) {
-                            WorkoutSummaryTable.deleteForUser(username)
-                            Toast.makeText(context, "Privacy mode updated. Online summaries cleared.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            // Clear old online summaries first to prevent duplicate rows
-                            WorkoutSummaryTable.deleteForUser(username)
-                            val localWorkouts = db.workoutDao().getWorkouts(username).first()
-                            var uploaded = 0
-                            for (w in localWorkouts) {
-                                val summary = WorkoutSummary(
-                                    username = username,
-                                    type = w.type,
-                                    startTime = w.startTime,
-                                    durationSec = w.durationSec,
-                                    minHr = w.minHr,
-                                    avgHr = w.avgHr,
-                                    maxHr = w.maxHr,
-                                    points = PointsCalculator.calculate(w.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR)
-                                )
-                                if (WorkoutSummaryTable.insert(summary)) uploaded++
-                            }
-                            val streak = streakDays(localWorkouts)
-                            UserTable.setStreak(username, streak)
-                            Toast.makeText(context, "Sharing enabled. $uploaded past workouts uploaded.", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            )
-        }
-    }
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    DeviceIdCard(username = username, savedId = deviceId)
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    // Setting button
+    // 2. Settings Button
     Button(
         onClick = {
             val intent = Intent(context, SettingsPage::class.java).apply {
@@ -589,147 +491,18 @@ fun ProfileContent(
             .fillMaxWidth()
             .height(56.dp)
     ) {
-        Text(text = "Settings", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(text = "⚙️ Settings", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
-
-    // Export Data & Delete My Data Card
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            Text(text = "📁 Manage Data", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text(
-                text = "Export your workout sessions and ECG checks as a CSV file, or delete your saved data.",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 14.sp
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ENGLISH).format(Date())
-                        exportLauncher.launch("polar_data_$timestamp.csv")
-                    },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Orange, contentColor = Color.White),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                ) {
-                    Text(text = "Export (CSV)", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                }
-
-                Button(
-                    onClick = { showDeleteDialog = true },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F), contentColor = Color.White),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                ) {
-                    Text(text = "Delete Data", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-    }
-
-    if (showDeleteDialog) {
-        Dialog(onDismissRequest = { showDeleteDialog = false }) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White)
-                    .padding(20.dp)
-            ) {
-                Text(
-                    text = "Delete My Data",
-                    color = Color.Black,
-                    fontSize = 22.sp,
-                    fontFamily = WorkSans,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "This can't be undone. Are you sure you want to delete all workouts and health data? Export first if you want to keep a copy.",
-                    color = Color.DarkGray,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = deleteAccountToo,
-                        onCheckedChange = { deleteAccountToo = it },
-                        colors = CheckboxDefaults.colors(checkedColor = Orange)
-                    )
-                    Text(
-                        text = "Delete account too",
-                        color = Color.Black,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = { showDeleteDialog = false }) {
-                        Text("Cancel", color = Color.Gray)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            showDeleteDialog = false
-                            scope.launch {
-                                // 1. Room DAOs
-                                db.workoutDao().deleteForUser(username)
-                                db.ecgDao().deleteForUser(username)
-                                db.deviceDao().deleteForUser(username)
-                                db.baselineDao().deleteForUser(username)
-
-                                // 2. Online tables
-                                WorkoutSummaryTable.deleteForUser(username)
-                                AssessmentTable.deleteForUser(username)
-
-                                if (deleteAccountToo) {
-                                    UserTable.deleteUser(username)
-                                }
-
-                                // 3. DataStore keys
-                                SettingsStore.clearUserData(context, username)
-
-                                // 4. Clear session and log out
-                                SessionStore.clear(context)
-                                Toast.makeText(context, "Data deleted", Toast.LENGTH_SHORT).show()
-
-                                val intent = Intent(context, SignPage::class.java).apply {
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                }
-                                context.startActivity(intent)
-                                (context as Activity).finish()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
-                    ) {
-                        Text("Confirm Delete", color = Color.White)
-                    }
-                }
-            }
-        }
-    }
-
-    // Only in debug builds (when running from Android Studio), never in a release app
+    // Debug Demo Data Card
     if (BuildConfig.DEBUG) {
         Spacer(modifier = Modifier.height(12.dp))
         DemoDataCard(username = username)
     }
 
-    Spacer(modifier = Modifier.height(20.dp))
+    Spacer(modifier = Modifier.weight(1f))
 
+    // 3. Log Out Button at the very bottom
     Button(
         onClick = {
             SessionStore.clear(context)
