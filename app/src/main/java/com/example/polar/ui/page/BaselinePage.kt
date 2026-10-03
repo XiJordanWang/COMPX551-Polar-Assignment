@@ -42,6 +42,7 @@ import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
 import com.example.polar.data.polar.PolarManager
 import androidx.compose.runtime.collectAsState
+import com.example.polar.data.DataGate
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Baseline
 import kotlinx.coroutines.launch
@@ -149,15 +150,14 @@ fun BaselineScreen(username: String = "demo") {
             stable = variation < 10
 
             scope.launch {
-                AppDatabase
-                    .getDatabase(context)
-                    .baselineDao()
-                    .save(
-                        Baseline(
-                            username = username,
-                            baselineHr = restingHr
-                        )
+                DataGate.saveBaseline(
+                    context,
+                    username,
+                    Baseline(
+                        username = username,
+                        baselineHr = restingHr
                     )
+                )
             }
 
             status = "done"

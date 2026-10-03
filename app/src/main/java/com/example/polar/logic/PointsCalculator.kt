@@ -7,11 +7,11 @@ import kotlin.math.roundToInt
 // ---------- Configuration ----------
 
 data class PointsConfig(
-    val basePointsPerMinute: Double = 10.0,
+    val basePointsPerMinute: Double = 6.0,
     val lowIntensityMultiplier: Double = 1.0,
-    val moderateIntensityMultiplier: Double = 1.5,
-    val intenseIntensityMultiplier: Double = 2.0,
-    val upperHeartRateReserveFraction: Double = 0.85,
+    val moderateIntensityMultiplier: Double = 2.0,
+    val intenseIntensityMultiplier: Double = 3.0,
+    val upperHeartRateReserveFraction: Double = 1.0,
     val minimumValidHeartRate: Int = 35,
     val maximumSuddenChangeBpm: Int = 40,
     val staleReadingSeconds: Long = 5
@@ -56,7 +56,7 @@ object PointsCalculator {
     fun calculate(
         heartRates: List<Int>,
         baseline: Int,
-        age: Int,
+        age: Int = 25,
         config: PointsConfig = PointsConfig()
     ): Int {
 
@@ -128,13 +128,13 @@ object PointsCalculator {
             lowPoints +
                 moderatePoints +
                 intensePoints
-            ).roundToInt()
+            ).toInt()
     }
 
     fun calculateActiveSeconds(
         heartRates: List<Int>,
         baseline: Int,
-        age: Int,
+        age: Int = 25,
         config: PointsConfig = PointsConfig()
     ): Long {
 
@@ -177,7 +177,7 @@ object PointsCalculator {
     fun getZone(
         hr: Int,
         baseline: Int,
-        age: Int,
+        age: Int = 25,
         config: PointsConfig = PointsConfig()
     ): ExerciseZone {
 
@@ -212,7 +212,7 @@ object PointsCalculator {
 
     fun calculateUpperHeartRateCap(
         baseline: Int,
-        age: Int,
+        age: Int = 25,
         config: PointsConfig = PointsConfig()
     ): Int {
 
@@ -249,7 +249,7 @@ object PointsCalculator {
     fun checkHeartRateReading(
         heartRate: Int,
         previousHeartRate: Int?,
-        age: Int,
+        age: Int = 25,
         secondsSinceLastReading: Long = 0,
         config: PointsConfig = PointsConfig()
     ): HeartRateCheck {

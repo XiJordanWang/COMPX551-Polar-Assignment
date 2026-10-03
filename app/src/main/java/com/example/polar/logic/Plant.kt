@@ -56,7 +56,7 @@ fun progressToNextStage(points: Int): Float {
 fun totalPoints(
     workouts: List<Workout>,
     baseline: Int,
-    age: Int,
+    age: Int = 25,
     config: PointsConfig = PointsConfig()
 ): Int {
     return workouts.sumOf {
@@ -72,7 +72,7 @@ fun totalPoints(
 fun todayPoints(
     workouts: List<Workout>,
     baseline: Int,
-    age: Int,
+    age: Int = 25,
     config: PointsConfig = PointsConfig()
 ): Int {
     val today = startOfDay(daysAgo = 0)
@@ -95,7 +95,7 @@ fun todayPoints(
 fun todayActiveSeconds(
     workouts: List<Workout>,
     baseline: Int,
-    age: Int,
+    age: Int = 25,
     config: PointsConfig = PointsConfig()
 ): Long {
     val today = startOfDay(daysAgo = 0)
@@ -115,7 +115,7 @@ fun todayActiveSeconds(
 fun todayActiveMinutes(
     workouts: List<Workout>,
     baseline: Int,
-    age: Int,
+    age: Int = 25,
     config: PointsConfig = PointsConfig()
 ): Double {
     return todayActiveSeconds(

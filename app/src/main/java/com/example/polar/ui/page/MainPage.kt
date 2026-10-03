@@ -72,6 +72,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import com.example.polar.BuildConfig
+import com.example.polar.data.DataGate
+import com.example.polar.data.SaveResult
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Device
 import com.example.polar.data.entity.Workout
@@ -533,7 +535,7 @@ fun ProfileContent(
                 onSelect = { newMode ->
                     scope.launch {
                         SettingsStore.setPrivacyMode(context, username, newMode)
-                        val isSharing = newMode == PrivacyMode.SHARE || newMode == PrivacyMode.FULL
+                        val isSharing = newMode == PrivacyMode.SHARE
                         UserTable.setSharing(username, isSharing)
 
                         if (!isSharing) {
@@ -806,10 +808,9 @@ fun DemoDataCard(username: String) {
                         val alreadySaved = workoutDao.getStartTimes(username)
                         val workouts = demoWorkouts(username).filter { it.startTime !in alreadySaved }
 
+                        var savedCount = 0
                         var uploaded = 0
                         for (workout in workouts) {
-                            // Same as pressing Stop: full workout on the phone, summary online
-                            workoutDao.insert(workout)
                             val summary = WorkoutSummary(
                                 username = username,
                                 type = workout.type,
@@ -820,12 +821,14 @@ fun DemoDataCard(username: String) {
                                 maxHr = workout.maxHr,
                                 points = PointsCalculator.calculate(workout.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR)
                             )
-                            if (WorkoutSummaryTable.insert(summary)) {
+                            val res = DataGate.saveWorkout(context, username, workout, summary)
+                            savedCount++
+                            if (res == SaveResult.SAVED_LOCAL_AND_ONLINE) {
                                 uploaded++
                             }
                         }
                         adding = false
-                        val message = if (workouts.isEmpty()) "Demo workouts are already added" else "Added ${workouts.size} demo workouts ($uploaded uploaded)"
+                        val message = if (workouts.isEmpty()) "Demo workouts are already added" else "Added $savedCount demo workouts ($uploaded uploaded to cloud)"
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
                 },

@@ -52,7 +52,7 @@ fun SocialContent(username: String) {
 
     // Runs every time the tab is opened or mode changes
     LaunchedEffect(privacyMode) {
-        if (privacyMode == PrivacyMode.SHARE || privacyMode == PrivacyMode.FULL) {
+        if (privacyMode == PrivacyMode.SHARE) {
             rows = LeaderboardTable.getAll()
         } else {
             rows = emptyList()
@@ -62,7 +62,7 @@ fun SocialContent(username: String) {
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    if (privacyMode == PrivacyMode.READ_ONLY) {
+    if (privacyMode != PrivacyMode.SHARE) {
         GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
@@ -71,7 +71,7 @@ fun SocialContent(username: String) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "🌱 Turn on sharing to see Plant Friends",
+                    text = "🌱 Turn on cloud sharing to see Plant Friends",
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
@@ -79,7 +79,7 @@ fun SocialContent(username: String) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "You are currently in Read-only mode. Switch to Share mode on the Profile tab to see the garden and share your plant.",
+                    text = "You are currently in 'Saved locally' mode. Switch to 'Uploaded to cloud' on the Profile tab to join the garden and see the leaderboard.",
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center

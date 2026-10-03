@@ -2,6 +2,7 @@ package com.example.polar.data
 
 import android.content.Context
 import com.example.polar.data.db.AppDatabase
+import com.example.polar.data.entity.Baseline
 import com.example.polar.data.entity.EcgCheck
 import com.example.polar.data.entity.Workout
 import com.example.polar.data.online.Assessment
@@ -16,8 +17,7 @@ import kotlinx.coroutines.flow.first
 
 enum class SaveResult {
     SAVED_LOCAL_AND_ONLINE,
-    SAVED_LOCAL_ONLY,
-    READ_ONLY
+    SAVED_LOCAL_ONLY
 }
 
 object DataGate {
@@ -28,19 +28,13 @@ object DataGate {
         workout: Workout,
         summary: WorkoutSummary
     ): SaveResult {
-        val mode = SettingsStore.privacyMode(context, username).first()
-        if (mode == PrivacyMode.READ_ONLY) {
-            return SaveResult.READ_ONLY
-        }
-
-        // Save to Room
+        // Always save to Room DB locally
         val db = AppDatabase.getDatabase(context)
         db.workoutDao().insert(workout)
 
-        // Upload only if SHARE or FULL
-        return if (mode == PrivacyMode.SHARE || mode == PrivacyMode.FULL) {
+        val mode = SettingsStore.privacyMode(context, username).first()
+        return if (mode == PrivacyMode.SHARE) {
             val uploaded = WorkoutSummaryTable.insert(summary)
-            // Also update streak online
             val allWorkouts = db.workoutDao().getWorkouts(username).first()
             val streak = streakDays(allWorkouts)
             UserTable.setStreak(username, streak)
@@ -56,10 +50,6 @@ object DataGate {
         username: String,
         check: EcgCheck
     ): SaveResult {
-        val mode = SettingsStore.privacyMode(context, username).first()
-        if (mode == PrivacyMode.READ_ONLY) {
-            return SaveResult.READ_ONLY
-        }
         AppDatabase.getDatabase(context).ecgDao().insert(check)
         return SaveResult.SAVED_LOCAL_ONLY
     }
@@ -70,10 +60,20 @@ object DataGate {
         assessment: Assessment
     ): SaveResult {
         val mode = SettingsStore.privacyMode(context, username).first()
-        if (mode == PrivacyMode.READ_ONLY) {
-            return SaveResult.READ_ONLY
+        return if (mode == PrivacyMode.SHARE) {
+            val saved = AssessmentTable.save(assessment)
+            if (saved) SaveResult.SAVED_LOCAL_AND_ONLINE else SaveResult.SAVED_LOCAL_ONLY
+        } else {
+            SaveResult.SAVED_LOCAL_ONLY
         }
-        val saved = AssessmentTable.save(assessment)
-        return if (saved) SaveResult.SAVED_LOCAL_AND_ONLINE else SaveResult.SAVED_LOCAL_ONLY
+    }
+
+    suspend fun saveBaseline(
+        context: Context,
+        username: String,
+        baseline: Baseline
+    ): SaveResult {
+        AppDatabase.getDatabase(context).baselineDao().save(baseline)
+        return SaveResult.SAVED_LOCAL_ONLY
     }
 }
