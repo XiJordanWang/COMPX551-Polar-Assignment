@@ -24,30 +24,38 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
 
+// Activity that displays a step-by-step setup guide for the Polar H10 chest strap.
 class H10GuidePage : ComponentActivity() {
 
+    // Called when the activity is first created
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Enable edge-to-edge layout so content extends behind status and navigation bars
         enableEdgeToEdge()
 
+        // Set up the Jetpack Compose UI content
         setContent {
             PolarTheme {
 
+                // Full-screen container box
                 Box(
                     modifier = Modifier.fillMaxSize()
                 ) {
 
+                    // Animated or static garden theme background view
                     GardenBackground()
 
+                    // Main vertical layout for screen contents
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .statusBarsPadding()
-                            .navigationBarsPadding()
-                            .padding(20.dp)
+                            .statusBarsPadding() // Inset content below top status bar
+                            .navigationBarsPadding() // Inset content above bottom navigation bar
+                            .padding(20.dp) // Outer screen padding
                     ) {
 
+                        // Screen title heading
                         Text(
                             text = "Polar H10 Guide",
                             color = Color.White,
@@ -56,8 +64,10 @@ class H10GuidePage : ComponentActivity() {
                             fontWeight = FontWeight.Bold
                         )
 
+                        // Vertical spacing before instructions
                         Spacer(modifier = Modifier.height(20.dp))
 
+                        // Step-by-step text guide for setting up and wearing the Polar H10 sensor
                         Text(
                             text =
                                 """
@@ -76,8 +86,10 @@ class H10GuidePage : ComponentActivity() {
                             fontSize = 16.sp
                         )
 
+                        // Vertical spacing before video link
                         Spacer(modifier = Modifier.height(20.dp))
 
+                        // Clickable text button that opens an external YouTube video guide in a browser
                         Text(
                             text = "Confused! 🎥 Check this Video Guide",
                             color = Color.White,
@@ -85,11 +97,13 @@ class H10GuidePage : ComponentActivity() {
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
 
+                                // Create intent to launch the video URL in a browser or YouTube app
                                 val intent = Intent(
                                     Intent.ACTION_VIEW,
                                     Uri.parse("https://youtu.be/XDFcxN611KY")
                                 )
 
+                                // Start the video link activity
                                 this@H10GuidePage.startActivity(intent)
                             }
                         )

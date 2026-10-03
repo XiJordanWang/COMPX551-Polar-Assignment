@@ -43,8 +43,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -83,15 +81,9 @@ import com.example.polar.data.model.WorkoutType
 import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
 import com.example.polar.data.online.Assessment
-import com.example.polar.data.online.AssessmentTable
-import com.example.polar.data.online.UserTable
 import com.example.polar.data.online.WorkoutSummary
-import com.example.polar.data.online.WorkoutSummaryTable
-import com.example.polar.data.prefs.PrivacyMode
 import com.example.polar.data.prefs.SessionStore
 import com.example.polar.data.prefs.SettingsStore
-import com.example.polar.data.prefs.description
-import com.example.polar.data.prefs.title
 import com.example.polar.logic.CoachMode
 import com.example.polar.logic.CoachTrigger
 import com.example.polar.logic.DEFAULT_STYLE_ID
@@ -112,32 +104,28 @@ import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
 import com.example.polar.work.StreakReminderWorker
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.random.Random
 import com.example.polar.data.polar.PolarManager
 import android.util.Log
 import com.example.polar.data.polar.SharedPolarManager
 import android.bluetooth.BluetoothAdapter
+import android.content.Context
 import android.location.LocationManager
 import android.provider.Settings
 
+// Main activity hosted after user sign-in. Schedules background notifications and holds root screen.
 class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Sent from SignPage after a successful sign in
+        // User identity parameters passed from SignPage
         val firstName = intent.getStringExtra("firstName") ?: ""
         val lastName = intent.getStringExtra("lastName") ?: ""
         val username = intent.getStringExtra("username") ?: ""
 
-        // Daily streak reminder around 7pm (does nothing if it is already scheduled)
+        // Schedule daily background streak reminder worker at 7pm
         StreakReminderWorker.schedule(this)
 
         setContent {
@@ -147,8 +135,7 @@ class MainPage : ComponentActivity() {
         }
     }
 
-    // Goes up by 1 every time this page comes back to the front,
-    // e.g. after the Assessment page. The screen uses it to reload online data.
+    // Counter incremented when returning to activity to reload online assessments
     private var resumeCount by mutableIntStateOf(0)
 
     override fun onResume() {
@@ -157,28 +144,27 @@ class MainPage : ComponentActivity() {
     }
 }
 
+// Main root container composable managing navigation tabs, permissions, and database streams
 @Composable
 fun SensorScreen(firstName: String, lastName: String, username: String, resumeCount: Int) {
-    // Which tab is showing: "home", "history" or "profile"
     var tab by remember { mutableStateOf("home") }
-
     val context = LocalContext.current
 
-    //bluetooth and location permission
+    // System services for Bluetooth and Location checking
     val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-
     val locationManager =
         context.getSystemService(
-            android.content.Context.LOCATION_SERVICE
+            Context.LOCATION_SERVICE
         ) as LocationManager
 
+    // Shared PolarManager instance for app-wide BLE streaming
     val polarManager = remember {
-
         SharedPolarManager.polarManager ?: PolarManager(context).also {
             SharedPolarManager.polarManager = it
         }
     }
 
+    // Bluetooth permission request handler
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -211,71 +197,40 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
     LaunchedEffect(Unit) {
         requestPermissionsIfNeeded()
     }
-    //requesting bluetooth and location permission
+
+    // Prompt user if Bluetooth or Location services are disabled
     LaunchedEffect(Unit) {
-
-        if (bluetoothAdapter != null &&
-            !bluetoothAdapter.isEnabled
-        ) {
-
-            Toast.makeText(
-                context,
-                "Please turn on Bluetooth",
-                Toast.LENGTH_LONG
-            ).show()
-
-            context.startActivity(
-                Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
-            )
+        if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
+            Toast.makeText(context, "Please turn on Bluetooth", Toast.LENGTH_LONG).show()
+            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
         }
 
         val locationEnabled =
-            locationManager.isProviderEnabled(
-                LocationManager.GPS_PROVIDER
-            ) ||
-                    locationManager.isProviderEnabled(
-                        LocationManager.NETWORK_PROVIDER
-                    )
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 
         if (!locationEnabled) {
-
-            Toast.makeText(
-                context,
-                "Please turn on Location",
-                Toast.LENGTH_LONG
-            ).show()
-
-            context.startActivity(
-                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-            )
+            Toast.makeText(context, "Please turn on Location", Toast.LENGTH_LONG).show()
+            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
         }
     }
 
-    // Local data (Room): workouts and the device ID. Because they are Flows,
-    // the screen updates by itself when they change.
-    // remember {} so we don't create a new Flow every recomposition.
+    // Room database flows observing local workouts and saved device ID
     val db = remember { AppDatabase.getDatabase(context) }
     val workoutsFlow = remember { db.workoutDao().getWorkouts(username) }
     val deviceIdFlow = remember { db.deviceDao().observeDeviceId(username) }
     val workouts by workoutsFlow.collectAsState(initial = emptyList())
     val deviceId by deviceIdFlow.collectAsState(initial = null)
 
+    // Automatically trigger connection to Polar H10 when device ID is available
     LaunchedEffect(deviceId) {
-
-        if (!deviceId.isNullOrBlank()) {
-
-            Log.d(
-                "POLAR",
-                "MainPage connecting to $deviceId"
-            )
-
+        if (!deviceId.isNullOrBlank() && !polarManager.sensorData.value.connected) {
+            Log.d("POLAR", "MainPage connecting to $deviceId")
             polarManager.connect(deviceId!!)
         }
     }
 
-    // Assessment: loaded via DataGate (local or online based on privacy mode).
-    // Online tables don't update by themselves,
-    // so we load it again every time this page comes back (resumeCount changes).
+    // Reload assessment data whenever screen resumes
     var assessment by remember { mutableStateOf<Assessment?>(null) }
     LaunchedEffect(resumeCount) {
         assessment = DataGate.loadAssessment(context, username)
@@ -320,7 +275,6 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
                         deviceId = deviceId
                     )
                 }
-                // Space so the bottom bar doesn't cover the last card
                 Spacer(modifier = Modifier.height(130.dp))
             }
         }
@@ -334,6 +288,7 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
     }
 }
 
+// Top app header displaying greeting, tab title, and user profile avatar
 @Composable
 fun Header(firstName: String, title: String, initials: String, onAvatarClick: () -> Unit) {
     Row(
@@ -357,13 +312,12 @@ fun Header(firstName: String, title: String, initials: String, onAvatarClick: ()
                 fontSize = 36.sp,
                 fontFamily = WorkSans,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp // Slightly tighter tracking, like the reference design
+                letterSpacing = (-0.5).sp
             )
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Avatar with the user's initials, tap it to open the profile
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -383,7 +337,7 @@ fun Header(firstName: String, title: String, initials: String, onAvatarClick: ()
     }
 }
 
-// See-through white card that looks good on the garden background
+// Reusable translucent card background container
 @Composable
 fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(
@@ -397,6 +351,7 @@ fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     }
 }
 
+// Home tab content presenting plant growth status, stats, shop, and quick feature shortcuts
 @Composable
 fun HomeContent(
     username: String,
@@ -406,24 +361,25 @@ fun HomeContent(
 ) {
     val context = LocalContext.current
 
-    // Points compare heart rate with the resting baseline (see PointsCalculator).
-    // Only recalculate when the workouts change.
+    // Calculate total points, today's points, and workout streak from history
     val baseline = PointsCalculator.DEFAULT_BASELINE_HR
     val points = remember(workouts) { totalPoints(workouts, baseline) }
     val today = remember(workouts) { todayPoints(workouts, baseline) }
     val streak = remember(workouts) { streakDays(workouts) }
 
-    // Plant style chosen in the shop (saved in SettingsStore). Classic if it isn't unlocked.
+    // Plant cosmetic style preference
     val scope = rememberCoroutineScope()
     val savedStyleId by remember { SettingsStore.plantStyle(context, username) }.collectAsState(initial = DEFAULT_STYLE_ID)
     val style = usableStyle(savedStyleId, points)
 
     Spacer(modifier = Modifier.height(8.dp))
 
+    // Plant stage visualizer card
     PlantCard(points = points, style = style)
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    // Stat cards for workout streak and today's accumulated points
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         StatCard(label = "🔥 Streak", value = "$streak", unit = if (streak == 1) "day" else "days", modifier = Modifier.weight(1f))
         StatCard(label = "⭐ Today", value = "$today", unit = "pts", modifier = Modifier.weight(1f))
@@ -431,13 +387,14 @@ fun HomeContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    // Plant shop card for customizing plant styles
     ShopCard(totalPoints = points, chosenStyleId = style.id) { styleId ->
         scope.launch { SettingsStore.setPlantStyle(context, username, styleId) }
     }
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    // Which Polar H10 we connect to. Tapping it opens the profile tab to add or change it.
+    // Polar H10 device status card
     ModuleCard(
         emoji = "💓",
         title = "My Polar H10",
@@ -447,6 +404,7 @@ fun HomeContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    // Last workout summary card
     val last = workouts.firstOrNull()
     if (last == null) {
         GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -474,6 +432,7 @@ fun HomeContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    // ECG feature launcher card
     ModuleCard(emoji = "❤️", title = "ECG Check", subtitle = "30 second reading at rest") {
         val intent = Intent(context, EcgPage::class.java)
         intent.putExtra("username", username)
@@ -482,6 +441,7 @@ fun HomeContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    // Personal assessment feature launcher card
     ModuleCard(emoji = "📋", title = "Assessment", subtitle = "Set your personal heart rate zones") {
         val intent = Intent(context, AssessmentPage::class.java)
         intent.putExtra("username", username)
@@ -489,7 +449,7 @@ fun HomeContent(
     }
 }
 
-// Card that opens another page, like "ECG Check" or "Assessment"
+// Reusable navigation module card component
 @Composable
 fun ModuleCard(emoji: String, title: String, subtitle: String, onClick: () -> Unit) {
     GlassCard(modifier = Modifier
@@ -507,6 +467,7 @@ fun ModuleCard(emoji: String, title: String, subtitle: String, onClick: () -> Un
     }
 }
 
+// Reusable numeric stat display card
 @Composable
 fun StatCard(label: String, value: String, unit: String, modifier: Modifier = Modifier) {
     GlassCard(modifier = modifier) {
@@ -527,6 +488,7 @@ fun StatCard(label: String, value: String, unit: String, modifier: Modifier = Mo
     }
 }
 
+// Profile tab content providing user info, settings access, debug tools, and logout
 @Composable
 fun ColumnScope.ProfileContent(
     firstName: String,
@@ -538,7 +500,7 @@ fun ColumnScope.ProfileContent(
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    // 1. User Identity Card
+    // User account details card
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Text(text = "Name", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
@@ -551,7 +513,7 @@ fun ColumnScope.ProfileContent(
 
     Spacer(modifier = Modifier.height(16.dp))
 
-    // 2. Settings Button
+    // Settings page launcher button
     Button(
         onClick = {
             val intent = Intent(context, SettingsPage::class.java).apply {
@@ -568,7 +530,7 @@ fun ColumnScope.ProfileContent(
         Text(text = "⚙️ Settings", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 
-    // Debug Demo Data Card
+    // Debug tool card for generating test workouts and coach notifications
     if (BuildConfig.DEBUG) {
         Spacer(modifier = Modifier.height(12.dp))
         DemoDataCard(username = username)
@@ -576,7 +538,7 @@ fun ColumnScope.ProfileContent(
 
     Spacer(modifier = Modifier.weight(1f))
 
-    // 3. Log Out Button at the very bottom
+    // Account logout button
     Button(
         onClick = {
             SessionStore.clear(context)
@@ -596,23 +558,18 @@ fun ColumnScope.ProfileContent(
     }
 }
 
-// DEMO ONLY: adds sample workouts with simulated heart rate, so the charts,
-// the plant and the leaderboard have data before the Polar H10 is connected.
+// Debug card for populating sample workouts and testing coach notification triggers
 @Composable
 fun DemoDataCard(username: String) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // True while saving, so the button can't be pressed twice
     var adding by remember { mutableStateOf(false) }
 
-    // TEMPORARY test of coach notifications.
-    // Uses the coach personality the user saved in Settings.
     val coachModeFlow = remember { SettingsStore.coachMode(context, username) }
     val coachMode by coachModeFlow.collectAsState(initial = CoachMode.SUPPORTIVE)
     var lastMessage by remember { mutableStateOf<String?>(null) }
 
     val sendTestMessage = {
-        // Any of the 3 triggers, so we can see different messages
         val trigger = CoachTrigger.entries.random()
         val message = pickMessage(coachMode, trigger, Random.Default, lastMessage)
         if (message != null) {
@@ -620,7 +577,6 @@ fun DemoDataCard(username: String) {
             lastMessage = message
             Toast.makeText(context, "Sent a $trigger message. Pull down the notification bar.", Toast.LENGTH_SHORT).show()
         } else {
-            // pickMessage returns null when the mode is OFF
             Toast.makeText(context, "Coach is Off, so no message. Change it in Settings.", Toast.LENGTH_SHORT).show()
         }
     }
@@ -651,7 +607,6 @@ fun DemoDataCard(username: String) {
                     adding = true
                     scope.launch {
                         val workoutDao = AppDatabase.getDatabase(context).workoutDao()
-                        // Skip demo workouts that are already saved, so pressing twice doesn't double them
                         val alreadySaved = workoutDao.getStartTimes(username)
                         val workouts = demoWorkouts(username).filter { it.startTime !in alreadySaved }
 
@@ -689,7 +644,6 @@ fun DemoDataCard(username: String) {
                 Text(text = if (adding) "Adding…" else "Add demo workouts", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
 
-            // ---------- TEMPORARY: try a coach notification on the phone ----------
             Spacer(modifier = Modifier.height(20.dp))
             Text(text = "🔔 Test coach message", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Text(
@@ -703,7 +657,6 @@ fun DemoDataCard(username: String) {
                     if (CoachNotifier.hasPermission(context)) {
                         sendTestMessage()
                     } else if (CoachNotifier.shouldAskPermission(context)) {
-                        // Android 13+ and never asked: ask now, then send (see the launcher above)
                         CoachNotifier.markPermissionAsked(context)
                         testPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     } else {
@@ -724,7 +677,6 @@ fun DemoDataCard(username: String) {
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            // Runs the daily streak check now, instead of waiting for 7pm
             Button(
                 onClick = {
                     StreakReminderWorker.runNow(context)
@@ -746,13 +698,12 @@ fun DemoDataCard(username: String) {
     }
 }
 
-// Type in and save the Polar H10 device ID
+// Polar H10 device ID entry card
 @Composable
 fun DeviceIdCard(username: String, savedId: String?) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
-    // Start with the saved ID so the user can see and edit it
     var input by remember(savedId) { mutableStateOf(savedId ?: "") }
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -768,7 +719,6 @@ fun DeviceIdCard(username: String, savedId: String?) {
 
             TextField(
                 value = input,
-                // Capital letters only, no spaces, max 8 characters
                 onValueChange = { input = cleanDeviceIdInput(it) },
                 placeholder = { Text("Device ID") },
                 singleLine = true,
@@ -777,7 +727,6 @@ fun DeviceIdCard(username: String, savedId: String?) {
                     keyboardType = KeyboardType.Ascii
                 ),
                 trailingIcon = {
-                    // Small green tick once the ID looks right
                     if (isValidDeviceId(input)) {
                         Text(text = "✓", color = Color(0xFF3E8E41), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
@@ -794,8 +743,6 @@ fun DeviceIdCard(username: String, savedId: String?) {
                     if (isValidDeviceId(input)) {
                         focusManager.clearFocus()
                         scope.launch {
-                            // Save in the local devices table. The home card reads it with a Flow,
-                            // so it shows the new ID by itself.
                             AppDatabase.getDatabase(context).deviceDao().save(Device(username, input))
                             Toast.makeText(context, "Device ID saved", Toast.LENGTH_SHORT).show()
                         }
@@ -815,12 +762,11 @@ fun DeviceIdCard(username: String, savedId: String?) {
     }
 }
 
+// Bottom navigation bar and floating workout start button
 @Composable
 fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    // Show the "choose workout" popup when the big button is pressed
     var showPicker by remember { mutableStateOf(false) }
-    // The sport the user picked, while we wait for the notification permission answer
     var pendingType by remember { mutableStateOf<WorkoutType?>(null) }
 
     val startWorkout = { type: WorkoutType ->
@@ -830,8 +776,6 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
         context.startActivity(intent)
     }
 
-    // Android 13+: asks "Allow Polar to send you notifications?".
-    // Allow or not, the workout starts afterwards. Without permission, coach messages are just skipped.
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { _ ->
@@ -843,7 +787,6 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
         WorkoutPicker(
             onPick = { type ->
                 showPicker = false
-                // Only before the first workout, only on Android 13+, only if not allowed yet
                 if (CoachNotifier.shouldAskPermission(context)) {
                     CoachNotifier.markPermissionAsked(context)
                     pendingType = type
@@ -863,7 +806,6 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
             .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        // White pill: Home and History on the left, Friends and Profile on the right
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -886,7 +828,6 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
                 onClick = { onTabClick("history") },
                 modifier = Modifier.weight(1f)
             )
-            // Empty space in the middle for the big button
             Spacer(modifier = Modifier.width(88.dp))
             NavItem(
                 icon = Icons.Filled.Face,
@@ -904,7 +845,7 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
             )
         }
 
-        // Big orange button to start a new workout, sits a bit above the bar
+        // Floating start workout button
         Box(
             modifier = Modifier
                 .offset(y = (-20).dp)
@@ -925,6 +866,7 @@ fun BottomBar(tab: String, username: String, onTabClick: (String) -> Unit, modif
     }
 }
 
+// Navigation item icon and label component
 @Composable
 fun NavItem(
     icon: ImageVector,
@@ -933,7 +875,6 @@ fun NavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Selected tab is orange, the others are grey
     val color = if (selected) Orange else Color.Gray
 
     Column(
@@ -945,7 +886,7 @@ fun NavItem(
     }
 }
 
-// Popup with all the workout types in two columns
+// Workout sport picker dialog popup
 @Composable
 fun WorkoutPicker(onPick: (WorkoutType) -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
@@ -966,7 +907,6 @@ fun WorkoutPicker(onPick: (WorkoutType) -> Unit, onDismiss: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // chunked(2) splits the list into rows of 2
             for (row in workoutTypes.chunked(2)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     for (type in row) {

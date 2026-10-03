@@ -1,17 +1,12 @@
 package com.example.polar.ui.page
 
-import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,16 +44,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.polar.data.DataGate
 import com.example.polar.data.SaveResult
-import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Workout
-import com.example.polar.data.online.AssessmentTable
 import com.example.polar.data.online.WorkoutSummary
-import com.example.polar.data.prefs.PrivacyMode
-import com.example.polar.data.prefs.SettingsStore
-import com.example.polar.data.polar.PolarManager
 import com.example.polar.logic.formatTime
 import com.example.polar.logic.maxHeartRate
 import com.example.polar.logic.PointsCalculator
@@ -68,15 +57,15 @@ import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.random.Random
 import com.example.polar.data.polar.SharedPolarManager
 
+// Activity for tracking live workouts, streaming real-time heart rate, and recording exercise sessions.
 class WorkoutPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Picked on the main page, e.g. "Running"
+        // Extract workout type (e.g. Running) and username passed from MainPage
         val workoutType = intent.getStringExtra("workoutType") ?: "Workout"
         val username = intent.getStringExtra("username") ?: ""
 
@@ -88,84 +77,29 @@ class WorkoutPage : ComponentActivity() {
     }
 }
 
+// Main workout tracking composable screen
 @Composable
 fun WorkoutScreen(workoutType: String, username: String) {
     val context = LocalContext.current
-    val polarManager = remember {
-        SharedPolarManager.polarManager
-            ?: PolarManager(context).also {
-                SharedPolarManager.polarManager = it
-            }
-    }
-    val db = remember {
-        AppDatabase.getDatabase(context)
-    }
 
-//    val deviceIdFlow = remember {
-//        db.deviceDao().observeDeviceId(username)
-//    }
-//    val deviceId by deviceIdFlow.collectAsState(initial = null)
-    val sensorData by polarManager.sensorData.collectAsState() //hr values from polar
-    // Foreground service: keeps the app alive with the screen off while this page is open.
-    // Stopped when the page closes (Stop button or back), see WorkoutService.kt
+    // Retrieve shared PolarManager instance for live BLE streaming
+    val polarManager =
+        SharedPolarManager.polarManager
+            ?: return
+
+    // Observe live sensor data (heart rate & accelerometer) from PolarManager
+    val sensorData by polarManager.sensorData.collectAsState()
+
+    // Manage foreground service lifecycle to keep heart rate recording active in background
     DisposableEffect(Unit) {
         WorkoutService.start(context)
         onDispose { WorkoutService.stop(context) }
     }
-    // Coach: sends a message if heart rate stays near the resting baseline (see InactivityCoach.kt)
+
+    // Inactivity coach: monitors heart rate stability and alerts if resting during exercise
     InactivityCoach(username = username, sensorData = polarManager.sensorData)
 
-//    val permissionLauncher = rememberLauncherForActivityResult(
-//        contract = ActivityResultContracts.RequestMultiplePermissions()
-//    ) { permissions ->
-//        val allGranted = permissions.values.all { it }
-//        if (allGranted && !deviceId.isNullOrBlank()) {
-//            Log.d("POLAR", "Permissions granted, connecting to $deviceId")
-//            polarManager.connect(deviceId!!)
-//        } else {
-//            Log.w("POLAR", "Bluetooth permissions denied or deviceId is blank")
-//        }
-//    }
-
-//    LaunchedEffect(deviceId) {
-//        Log.d("POLAR", "Device ID from database: $deviceId")
-//
-//        if (!deviceId.isNullOrBlank()) {
-//            val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-//                arrayOf(
-//                    Manifest.permission.BLUETOOTH_SCAN,
-//                    Manifest.permission.BLUETOOTH_CONNECT
-//                )
-//            } else {
-//                arrayOf(
-//                    Manifest.permission.ACCESS_FINE_LOCATION,
-//                    Manifest.permission.ACCESS_COARSE_LOCATION
-//                )
-//            }
-//
-//            val hasPermissions = permissionsToRequest.all {
-//                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-//            }
-//
-//            if (hasPermissions) {
-//                Log.d("POLAR", "Has permissions, trying to connect to $deviceId")
-//                polarManager.connect(deviceId!!)
-//            } else {
-//                Log.d("POLAR", "Requesting bluetooth permissions for $deviceId")
-//                permissionLauncher.launch(permissionsToRequest)
-//            }
-//        }
-//    }
-
-//    DisposableEffect(Unit) {
-//        onDispose {
-//            Log.d("POLAR", "WorkoutScreen disposed, disconnecting")
-//            polarManager.disconnect(deviceId)
-//        }
-//    }
-
-    // 200 gives the default zones (100 / 120 / 140 / 160).
-    // If the user did the assessment, use 220 - age instead.
+    // Calculate maximum heart rate based on user's assessment age, defaulting to 200 BPM
     var userMaxHr by remember { mutableIntStateOf(200) }
     LaunchedEffect(Unit) {
         val assessment = DataGate.loadAssessment(context, username)
@@ -173,42 +107,37 @@ fun WorkoutScreen(workoutType: String, username: String) {
             userMaxHr = maxHeartRate(assessment.age)
         }
     }
-    // One heart rate per second
+
+    // List storing one heart rate sample per second for the duration of the workout
     val heartRates = remember { mutableStateListOf<Int>() }
-   //hr values from polar
-    LaunchedEffect(sensorData.heartRate) {
 
-        if (sensorData.heartRate > 0) {
-
-            heartRates.add(sensorData.heartRate)
-
-            Log.d(
-                "POLAR_HR",
-                "WorkoutPage received HR = ${sensorData.heartRate}"
-            )
+    // Coroutine loop sampling heart rate values once per second from PolarManager
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            val hr = polarManager.sensorData.value.heartRate
+            if (hr > 0) {
+                heartRates.add(hr)
+                Log.d(
+                    "POLAR_HR",
+                    "WorkoutPage recorded HR = $hr (total samples: ${heartRates.size})"
+                )
+            }
         }
     }
+
     val startTime = remember { System.currentTimeMillis() }
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { 2 })
 
-    // replace this fake data with the real heart rate from the Polar SDK
-//    LaunchedEffect(Unit) {
-//        var hr = 75
-//        while (true) {
-//            delay(1000)
-//            hr = (hr + Random.nextInt(-3, 6)).coerceIn(60, 185)
-//            heartRates.add(hr)
-//        }
-//}
-
+    // Compute live workout summary statistics
     val seconds = heartRates.size
-    val currentHr = heartRates.lastOrNull() ?: 0
+    val currentHr = if (sensorData.heartRate > 0) sensorData.heartRate else (heartRates.lastOrNull() ?: 0)
     val minHr = heartRates.minOrNull() ?: 0
     val maxHr = heartRates.maxOrNull() ?: 0
     val avgHr = if (heartRates.isEmpty()) 0 else heartRates.average().toInt()
 
-    // Only show the last 60 seconds on the line chart
+    // Slice recent 60-second window for real-time line chart rendering
     val lastMinute = heartRates.takeLast(60)
     val firstSecond = seconds - lastMinute.size + 1
 
@@ -223,6 +152,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
                 .padding(20.dp)
         ) {
 
+            // Workout title header
             Text(
                 text = workoutType,
                 color = Color.White,
@@ -233,6 +163,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Primary metrics: elapsed time and current live heart rate
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatCard(label = "Time", value = formatTime(seconds), unit = "", modifier = Modifier.weight(1f))
                 StatCard(label = "Heart Rate", value = "$currentHr", unit = "bpm", modifier = Modifier.weight(1f))
@@ -240,7 +171,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Min / Avg / Max for the whole workout
+            // Secondary metrics: minimum, average, and maximum heart rate
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Row {
                     SmallStat(label = "Min", value = minHr, modifier = Modifier.weight(1f))
@@ -251,6 +182,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Chart area: swipeable view switching between 60s heart rate trend and intensity gauge
             GlassCard(modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)) {
@@ -262,7 +194,6 @@ fun WorkoutScreen(workoutType: String, username: String) {
                         fontWeight = FontWeight.Bold
                     )
 
-                    // Swipe left / right to change chart
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier
@@ -282,7 +213,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
                         }
                     }
 
-                    // Page dots
+                    // Pager indicator dots
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
@@ -304,10 +235,10 @@ fun WorkoutScreen(workoutType: String, username: String) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Stop workout button: computes final points and saves workout data locally and online
             Button(
                 onClick = {
                     if (heartRates.isEmpty()) {
-                        // Nothing recorded, don't save an empty workout
                         (context as Activity).finish()
                     } else {
                         val workout = Workout(
@@ -320,7 +251,6 @@ fun WorkoutScreen(workoutType: String, username: String) {
                             maxHr = maxHr,
                             heartRates = heartRates.joinToString(",")
                         )
-                        // Only the summary goes online, the heart rate of every second stays on the phone
                         val summary = WorkoutSummary(
                             username = username,
                             type = workoutType,
@@ -354,6 +284,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
     }
 }
 
+// Compact statistic item component (Min, Avg, Max)
 @Composable
 fun SmallStat(label: String, value: Int, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
