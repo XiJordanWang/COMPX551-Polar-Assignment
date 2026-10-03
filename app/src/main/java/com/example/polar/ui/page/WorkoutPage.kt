@@ -208,8 +208,6 @@ fun WorkoutScreen(workoutType: String, username: String) {
     val minHr = heartRates.minOrNull() ?: 0
     val maxHr = heartRates.maxOrNull() ?: 0
     val avgHr = if (heartRates.isEmpty()) 0 else heartRates.average().toInt()
-    val modeFlow = remember { SettingsStore.privacyMode(context, username) }
-    val privacyMode by modeFlow.collectAsState(initial = PrivacyMode.FULL)
 
     // Only show the last 60 seconds on the line chart
     val lastMinute = heartRates.takeLast(60)
@@ -225,23 +223,6 @@ fun WorkoutScreen(workoutType: String, username: String) {
                 .navigationBarsPadding()
                 .padding(20.dp)
         ) {
-            if (privacyMode == PrivacyMode.READ_ONLY) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFD32F2F), RoundedCornerShape(12.dp))
-                        .padding(vertical = 8.dp, horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Read-only: nothing will be saved",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
 
             Text(
                 text = workoutType,
@@ -354,8 +335,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
                         scope.launch {
                             val result = DataGate.saveWorkout(context, username, workout, summary)
                             val message = when (result) {
-                                SaveResult.READ_ONLY -> "Not saved (read-only mode)"
-                                SaveResult.SAVED_LOCAL_AND_ONLINE -> "Workout saved"
+                                SaveResult.SAVED_LOCAL_AND_ONLINE -> "Workout saved & uploaded to cloud"
                                 SaveResult.SAVED_LOCAL_ONLY -> "Workout saved on this phone"
                             }
                             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()

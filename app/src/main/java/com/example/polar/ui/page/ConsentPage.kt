@@ -106,8 +106,8 @@ fun ConsentScreen(firstName: String, username: String, lastName: String) {
 
             ConsentSection(title = "What", content = "Heart rate, RR intervals, ECG, accelerometer, and assessment answers.")
             ConsentSection(title = "Why", content = "To grow your plant, show your history and personal bests.")
-            ConsentSection(title = "Where", content = "On this phone (Room); summaries online only in Share mode; account online.")
-            ConsentSection(title = "Who can see it", content = "Only you; in Share mode others see your first name, points and streak.")
+            ConsentSection(title = "Where", content = "Saved on this phone (Room); uploaded to cloud (Supabase) if you choose 'Uploaded to cloud'.")
+            ConsentSection(title = "Who can see it", content = "Only you when saved locally; visible on the leaderboard when uploaded to cloud.")
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -132,7 +132,7 @@ fun ConsentScreen(firstName: String, username: String, lastName: String) {
                         SettingsStore.setPrivacyMode(context, username, selectedMode)
                         SettingsStore.setConsent(context, username, CONSENT_VERSION)
 
-                        val isSharing = selectedMode == PrivacyMode.SHARE || selectedMode == PrivacyMode.FULL
+                        val isSharing = selectedMode == PrivacyMode.SHARE
                         UserTable.setSharing(username, isSharing)
 
                         if (isSharing) {

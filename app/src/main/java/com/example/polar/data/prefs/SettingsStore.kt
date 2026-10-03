@@ -15,8 +15,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 enum class PrivacyMode {
-    FULL, SHARE, READ_ONLY
+    FULL, SHARE
 }
+
+val PrivacyMode.title: String
+    get() = when (this) {
+        PrivacyMode.FULL -> "Saved locally"
+        PrivacyMode.SHARE -> "Uploaded to cloud"
+    }
+
+val PrivacyMode.description: String
+    get() = when (this) {
+        PrivacyMode.FULL -> "Data is saved only on your phone. You won't appear on the leaderboard."
+        PrivacyMode.SHARE -> "Workout summaries are uploaded to Supabase so you can participate in the leaderboard."
+    }
 
 private val Context.dataStore by preferencesDataStore(name = "user_settings")
 

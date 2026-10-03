@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.prefs.PrivacyMode
+import com.example.polar.data.prefs.description
+import com.example.polar.data.prefs.title
 
 // Reusable privacy mode selection picker (Full / Share / Read-only)
 @Composable
@@ -30,14 +32,10 @@ fun PrivacyModePicker(
     onSelect: (PrivacyMode) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val modes = listOf(
-        PrivacyMode.FULL to "Full: All workout and ECG data shared publicly",
-        PrivacyMode.SHARE to "Share: Share workout summaries without ECG details",
-        PrivacyMode.READ_ONLY to "Read-only: Keep all workouts and health data private"
-    )
+    val modes = PrivacyMode.entries
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for ((mode, description) in modes) {
+        for (mode in modes) {
             val isSelected = mode == selected
             val backgroundCol = if (isSelected) Color.White.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.15f)
             val borderCol = if (isSelected) Color.White else Color.White.copy(alpha = 0.3f)
@@ -54,7 +52,7 @@ fun PrivacyModePicker(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = mode.name,
+                            text = mode.title,
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
@@ -66,7 +64,7 @@ fun PrivacyModePicker(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = description.substringAfter(": "),
+                        text = mode.description,
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp
                     )

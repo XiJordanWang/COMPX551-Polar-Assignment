@@ -203,9 +203,8 @@ fun AssessmentScreen(username: String) {
                         val result = DataGate.saveAssessment(context, username, assessment)
                         saved = assessment
                         val message = when (result) {
-                            SaveResult.READ_ONLY -> "Assessment calculated (read-only mode, not saved online)"
-                            SaveResult.SAVED_LOCAL_AND_ONLINE -> "Assessment saved"
-                            SaveResult.SAVED_LOCAL_ONLY -> "Assessment calculated"
+                            SaveResult.SAVED_LOCAL_AND_ONLINE -> "Assessment saved & uploaded to cloud"
+                            SaveResult.SAVED_LOCAL_ONLY -> "Assessment saved on this phone"
                         }
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }

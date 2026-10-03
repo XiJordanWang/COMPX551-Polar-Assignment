@@ -74,8 +74,6 @@ class EcgPage : ComponentActivity() {
 @Composable
 fun EcgScreen(username: String = "") {
     val context = LocalContext.current
-    val modeFlow = remember { SettingsStore.privacyMode(context, username) }
-    val privacyMode by modeFlow.collectAsState(initial = PrivacyMode.FULL)
 
     // "ready" -> "measuring" -> "done"
     var status by remember { mutableStateOf("ready") }
@@ -111,10 +109,7 @@ fun EcgScreen(username: String = "") {
                 restingHr = restingHr,
                 samples = allSamples.joinToString(",")
             )
-            val result = DataGate.saveEcg(context, username, check)
-            if (result == SaveResult.READ_ONLY) {
-                Toast.makeText(context, "Not saved (read-only mode)", Toast.LENGTH_SHORT).show()
-            }
+            DataGate.saveEcg(context, username, check)
 
             status = "done"
         }
@@ -130,23 +125,6 @@ fun EcgScreen(username: String = "") {
                 .navigationBarsPadding()
                 .padding(20.dp)
         ) {
-            if (privacyMode == PrivacyMode.READ_ONLY) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFD32F2F), RoundedCornerShape(12.dp))
-                        .padding(vertical = 8.dp, horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Read-only: nothing will be saved",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
 
             Text(
                 text = "ECG Check",
