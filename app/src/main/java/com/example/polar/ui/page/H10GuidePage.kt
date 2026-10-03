@@ -67,9 +67,10 @@ class H10GuidePage : ComponentActivity() {
 4. Turn Bluetooth on.
 5. Turn Location Services on.
 6. Save your Polar device ID in Profile.
-7. Start a workout.
-8. Wait until the device connects.
-9. Begin exercising.
+7. Wait until the device connects.
+8. Set the Heart Rate Baseline
+9. Click on a workout when you are ready to start.
+10. Begin exercising.
                             """.trimIndent(),
                             color = Color.White,
                             fontSize = 16.sp
@@ -78,7 +79,7 @@ class H10GuidePage : ComponentActivity() {
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Text(
-                            text = "🎥 Check this Video Guide",
+                            text = "Confused! 🎥 Check this Video Guide",
                             color = Color.White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,

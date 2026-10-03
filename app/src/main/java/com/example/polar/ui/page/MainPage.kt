@@ -123,6 +123,9 @@ import kotlin.random.Random
 import com.example.polar.data.polar.PolarManager
 import android.util.Log
 import com.example.polar.data.polar.SharedPolarManager
+import android.bluetooth.BluetoothAdapter
+import android.location.LocationManager
+import android.provider.Settings
 
 class MainPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -160,6 +163,14 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
     var tab by remember { mutableStateOf("home") }
 
     val context = LocalContext.current
+
+    //bluetooth and location permission
+    val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+
+    val locationManager =
+        context.getSystemService(
+            android.content.Context.LOCATION_SERVICE
+        ) as LocationManager
 
     val polarManager = remember {
 
@@ -199,6 +210,45 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
 
     LaunchedEffect(Unit) {
         requestPermissionsIfNeeded()
+    }
+    //requesting bluetooth and location permission
+    LaunchedEffect(Unit) {
+
+        if (bluetoothAdapter != null &&
+            !bluetoothAdapter.isEnabled
+        ) {
+
+            Toast.makeText(
+                context,
+                "Please turn on Bluetooth",
+                Toast.LENGTH_LONG
+            ).show()
+
+            context.startActivity(
+                Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+            )
+        }
+
+        val locationEnabled =
+            locationManager.isProviderEnabled(
+                LocationManager.GPS_PROVIDER
+            ) ||
+                    locationManager.isProviderEnabled(
+                        LocationManager.NETWORK_PROVIDER
+                    )
+
+        if (!locationEnabled) {
+
+            Toast.makeText(
+                context,
+                "Please turn on Location",
+                Toast.LENGTH_LONG
+            ).show()
+
+            context.startActivity(
+                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            )
+        }
     }
 
     // Local data (Room): workouts and the device ID. Because they are Flows,
