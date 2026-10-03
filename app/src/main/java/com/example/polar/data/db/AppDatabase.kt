@@ -15,9 +15,9 @@ import com.example.polar.data.entity.Device
 import com.example.polar.data.entity.EcgCheck
 import com.example.polar.data.entity.Workout
 
-// Local database on the phone (Room = SQLite).
-// Users, assessments and workout summaries are online (Supabase), see data/online.
-// Only things that belong to this phone stay here: full workouts and the device ID.
+/** The app's local Room database, which holds everything that stays on this phone. */
+// Users and assessments are online (Supabase), plus workout summaries when cloud sharing is on, see data/online.
+// Kept here: full workouts, the device ID, baselines and ECG checks.
 // https://developer.android.com/training/data-storage/room
 @Database(
     entities = [
@@ -86,6 +86,8 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+
+        // Version 6 adds the baselines table
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
 
@@ -99,6 +101,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Version 7 adds the ecg_checks table
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -130,8 +133,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6,
                         MIGRATION_6_7
                     )
-                    // Version 1 used email, version 2 uses username.
-                    // No real users yet, so just delete the old table instead of writing a migration.
+                    // Version 1 used email instead of username and has no migration.
+                    // If there's no migration for a version, Room deletes the whole database and starts again.
                     .fallbackToDestructiveMigration(true)
                     .build()
                 instance = db

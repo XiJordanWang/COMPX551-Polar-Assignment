@@ -6,6 +6,7 @@ import androidx.room.Query
 import com.example.polar.data.entity.Workout
 import kotlinx.coroutines.flow.Flow
 
+/** Saves and reads each user's workouts, including the full heart rate of every session. */
 @Dao
 interface WorkoutDao {
 

@@ -6,6 +6,7 @@ import androidx.room.Query
 import com.example.polar.data.entity.EcgCheck
 import kotlinx.coroutines.flow.Flow
 
+/** Saves and reads each user's ECG checks, kept only on this phone. */
 @Dao
 interface EcgDao {
 

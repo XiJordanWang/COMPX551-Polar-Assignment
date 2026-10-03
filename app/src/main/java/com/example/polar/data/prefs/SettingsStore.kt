@@ -1,9 +1,5 @@
 package com.example.polar.data.prefs
 
-/**
- * Manages user privacy mode and consent settings using Jetpack DataStore Preferences.
- */
-
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -14,6 +10,8 @@ import com.example.polar.logic.DEFAULT_STYLE_ID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+/** Saves each user's settings on this phone with DataStore: privacy mode, coach mode, plant style and consent. */
+// FULL = "Saved locally", SHARE = "Uploaded to cloud"
 enum class PrivacyMode {
     FULL, SHARE
 }
@@ -34,7 +32,7 @@ private val Context.dataStore by preferencesDataStore(name = "user_settings")
 
 object SettingsStore {
 
-    // Returns flow of PrivacyMode for the given username
+    // The user's privacy mode. Defaults to "Saved locally" if they haven't picked one.
     fun privacyMode(context: Context, username: String): Flow<PrivacyMode> {
         val key = stringPreferencesKey("mode_$username")
         return context.dataStore.data.map { prefs ->
@@ -47,7 +45,7 @@ object SettingsStore {
         }
     }
 
-    // Updates PrivacyMode for the given username
+    // Saves the user's privacy mode
     suspend fun setPrivacyMode(context: Context, username: String, mode: PrivacyMode) {
         val key = stringPreferencesKey("mode_$username")
         context.dataStore.edit { prefs ->
@@ -55,7 +53,7 @@ object SettingsStore {
         }
     }
 
-    // Returns flow of CoachMode for the given username (default SUPPORTIVE)
+    // The user's coach personality (default SUPPORTIVE)
     fun coachMode(context: Context, username: String): Flow<CoachMode> {
         val key = stringPreferencesKey("coach_mode_$username")
         return context.dataStore.data.map { prefs ->
@@ -68,7 +66,7 @@ object SettingsStore {
         }
     }
 
-    // Updates CoachMode for the given username
+    // Saves the user's coach personality
     suspend fun setCoachMode(context: Context, username: String, mode: CoachMode) {
         val key = stringPreferencesKey("coach_mode_$username")
         context.dataStore.edit { prefs ->
@@ -76,7 +74,7 @@ object SettingsStore {
         }
     }
 
-    // Returns flow of the chosen plant style id for the given username (default "classic")
+    // The plant style the user picked in the shop (default "classic")
     fun plantStyle(context: Context, username: String): Flow<String> {
         val key = stringPreferencesKey("plant_style_$username")
         return context.dataStore.data.map { prefs ->
@@ -84,7 +82,7 @@ object SettingsStore {
         }
     }
 
-    // Updates the chosen plant style for the given username
+    // Saves the user's plant style
     suspend fun setPlantStyle(context: Context, username: String, styleId: String) {
         val key = stringPreferencesKey("plant_style_$username")
         context.dataStore.edit { prefs ->
@@ -92,7 +90,7 @@ object SettingsStore {
         }
     }
 
-    // Returns flow of consent version for the given username
+    // Which version of the consent screen the user agreed to (0 = not yet)
     fun consentVersion(context: Context, username: String): Flow<Int> {
         val key = intPreferencesKey("consent_version_$username")
         return context.dataStore.data.map { prefs ->
@@ -100,7 +98,7 @@ object SettingsStore {
         }
     }
 
-    // Returns flow of consent accepted timestamp for the given username
+    // When the user agreed to the consent screen, in milliseconds (0 = not yet)
     fun consentTime(context: Context, username: String): Flow<Long> {
         val key = stringPreferencesKey("consent_time_$username")
         return context.dataStore.data.map { prefs ->
@@ -108,7 +106,7 @@ object SettingsStore {
         }
     }
 
-    // Sets consent version and saves acceptance timestamp for the given username
+    // Saves the consent version the user agreed to, and the time they agreed
     suspend fun setConsent(context: Context, username: String, version: Int) {
         val versionKey = intPreferencesKey("consent_version_$username")
         val timeKey = stringPreferencesKey("consent_time_$username")
@@ -119,7 +117,7 @@ object SettingsStore {
         }
     }
 
-    // Clears all DataStore settings keys for the specified user
+    // Removes all of this user's settings (used by "Delete my data")
     suspend fun clearUserData(context: Context, username: String) {
         val modeKey = stringPreferencesKey("mode_$username")
         val versionKey = intPreferencesKey("consent_version_$username")

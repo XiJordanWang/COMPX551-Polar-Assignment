@@ -3,8 +3,9 @@ package com.example.polar.data.online
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// One row in the online "assessments" table. One assessment per user,
-// so username is the primary key. Saving again replaces the old one.
+/** One row in the online "assessments" table. */
+// One assessment per user, so username is the primary key. Saving again replaces the old one.
+// Only uploaded when the user has chosen "Uploaded to cloud".
 @Serializable
 data class Assessment(
     val username: String,

@@ -5,7 +5,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 
-// The connection to our online database (Supabase, which is Postgres).
+/** The connection to our online database (Supabase, which is Postgres). */
 // The address and key come from local.properties, see app/build.gradle.kts.
 object Supabase {
 

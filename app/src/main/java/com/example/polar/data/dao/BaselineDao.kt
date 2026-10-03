@@ -6,6 +6,7 @@ import androidx.room.Upsert
 import com.example.polar.data.entity.Baseline
 import kotlinx.coroutines.flow.Flow
 
+/** Saves and reads each user's resting heart rate baseline (one per user). */
 @Dao
 interface BaselineDao {
 

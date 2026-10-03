@@ -2,6 +2,8 @@ package com.example.polar.data.prefs
 
 import android.content.Context
 
+/** Remembers who is logged in on this phone, so the app can skip sign in next time. */
+// SharedPreferences rather than DataStore: MainActivity reads this straight away at launch, before any screen is drawn.
 data class SavedUser(
     val username: String,
     val firstName: String,

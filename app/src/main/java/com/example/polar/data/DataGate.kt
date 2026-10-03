@@ -15,6 +15,7 @@ import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.streakDays
 import kotlinx.coroutines.flow.first
 
+/** Every save in the app goes through here, so the user's privacy mode is checked in one place. */
 enum class SaveResult {
     SAVED_LOCAL_AND_ONLINE,
     SAVED_LOCAL_ONLY
@@ -32,6 +33,7 @@ object DataGate {
         val db = AppDatabase.getDatabase(context)
         db.workoutDao().insert(workout)
 
+        // Only upload the summary (and update the streak) in "Uploaded to cloud" mode
         val mode = SettingsStore.privacyMode(context, username).first()
         return if (mode == PrivacyMode.SHARE) {
             val uploaded = WorkoutSummaryTable.insert(summary)
@@ -45,6 +47,7 @@ object DataGate {
         }
     }
 
+    // ECG checks are only ever saved on the phone
     suspend fun saveEcg(
         context: Context,
         username: String,
@@ -54,6 +57,8 @@ object DataGate {
         return SaveResult.SAVED_LOCAL_ONLY
     }
 
+    // Only uploaded in "Uploaded to cloud" mode.
+    // In "Saved locally" mode the assessment isn't stored anywhere yet.
     suspend fun saveAssessment(
         context: Context,
         username: String,
@@ -68,6 +73,7 @@ object DataGate {
         }
     }
 
+    // Baselines are only ever saved on the phone
     suspend fun saveBaseline(
         context: Context,
         username: String,

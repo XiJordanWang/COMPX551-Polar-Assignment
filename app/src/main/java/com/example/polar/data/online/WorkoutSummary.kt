@@ -3,8 +3,9 @@ package com.example.polar.data.online
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// One row in the online "workout_summaries" table.
-// Only the summary goes online. The heart rate of every second stays on the phone (Room).
+/** One row in the online "workout_summaries" table. */
+// Only the summary goes online, and only when the user has chosen "Uploaded to cloud".
+// The heart rate of every second stays on the phone (Room).
 @Serializable
 data class WorkoutSummary(
     val username: String,

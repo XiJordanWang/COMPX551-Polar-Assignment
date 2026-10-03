@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** Connects to the Polar H10 through the Polar BLE SDK and streams its heart rate and accelerometer data into a StateFlow. */
 class PolarManager(context: Context) {
 
     private val api: PolarBleApi =

@@ -3,7 +3,7 @@ package com.example.polar.data.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-// One finished workout
+/** One finished workout, as a row in the "workouts" table. */
 @Entity(tableName = "workouts")
 data class Workout(@PrimaryKey(autoGenerate = true) val id: Long = 0,
                    val username: String,
