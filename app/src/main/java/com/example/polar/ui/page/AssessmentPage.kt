@@ -92,8 +92,8 @@ fun AssessmentScreen(username: String) {
 
     // If the user did the assessment before, fill in the form
     LaunchedEffect(Unit) {
-        // Load from the online assessments table
-        val old = AssessmentTable.findByUsername(username)
+        // Load assessment (local or online based on privacy mode)
+        val old = DataGate.loadAssessment(context, username)
         if (old != null) {
             gender = old.gender
             age = old.age.toString()

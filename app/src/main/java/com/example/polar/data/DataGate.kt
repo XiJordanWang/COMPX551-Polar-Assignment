@@ -47,6 +47,16 @@ object DataGate {
         }
     }
 
+    // Load assessment based on privacy mode (local DataStore or online table)
+    suspend fun loadAssessment(context: Context, username: String): Assessment? {
+        val mode = SettingsStore.privacyMode(context, username).first()
+        return if (mode == PrivacyMode.FULL) {
+            SettingsStore.getAssessment(context, username) ?: AssessmentTable.findByUsername(username)
+        } else {
+            AssessmentTable.findByUsername(username) ?: SettingsStore.getAssessment(context, username)
+        }
+    }
+
     // ECG checks are only ever saved on the phone
     suspend fun saveEcg(
         context: Context,
@@ -57,14 +67,14 @@ object DataGate {
         return SaveResult.SAVED_LOCAL_ONLY
     }
 
-    // Only uploaded in "Uploaded to cloud" mode.
-    // In "Saved locally" mode the assessment isn't stored anywhere yet.
+    // Saved locally in SettingsStore (JSON), and uploaded to Supabase in "Uploaded to cloud" mode.
     suspend fun saveAssessment(
         context: Context,
         username: String,
         assessment: Assessment
     ): SaveResult {
         val mode = SettingsStore.privacyMode(context, username).first()
+        SettingsStore.setAssessment(context, username, assessment)
         return if (mode == PrivacyMode.SHARE) {
             val saved = AssessmentTable.save(assessment)
             if (saved) SaveResult.SAVED_LOCAL_AND_ONLINE else SaveResult.SAVED_LOCAL_ONLY

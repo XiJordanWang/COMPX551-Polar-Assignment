@@ -189,6 +189,11 @@ fun SettingsScreen(username: String) {
 
                             if (!isSharing) {
                                 WorkoutSummaryTable.deleteForUser(username)
+                                AssessmentTable.deleteForUser(username)
+                                val onlineAssessment = AssessmentTable.findByUsername(username)
+                                if (onlineAssessment != null) {
+                                    SettingsStore.setAssessment(context, username, onlineAssessment)
+                                }
                                 Toast.makeText(context, "Privacy mode updated. Saved locally.", Toast.LENGTH_SHORT).show()
                             } else {
                                 WorkoutSummaryTable.deleteForUser(username)
@@ -209,6 +214,10 @@ fun SettingsScreen(username: String) {
                                 }
                                 val streak = streakDays(localWorkouts)
                                 UserTable.setStreak(username, streak)
+                                val localAssessment = SettingsStore.getAssessment(context, username)
+                                if (localAssessment != null) {
+                                    AssessmentTable.save(localAssessment)
+                                }
                                 Toast.makeText(context, "Cloud sharing enabled. $uploaded past workouts uploaded.", Toast.LENGTH_SHORT).show()
                             }
                         }

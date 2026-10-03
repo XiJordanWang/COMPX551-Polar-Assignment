@@ -273,11 +273,12 @@ fun SensorScreen(firstName: String, lastName: String, username: String, resumeCo
         }
     }
 
-    // Online data (Supabase): the assessment. Online tables don't update by themselves,
+    // Assessment: loaded via DataGate (local or online based on privacy mode).
+    // Online tables don't update by themselves,
     // so we load it again every time this page comes back (resumeCount changes).
     var assessment by remember { mutableStateOf<Assessment?>(null) }
     LaunchedEffect(resumeCount) {
-        assessment = AssessmentTable.findByUsername(username)
+        assessment = DataGate.loadAssessment(context, username)
     }
 
     val title = when (tab) {

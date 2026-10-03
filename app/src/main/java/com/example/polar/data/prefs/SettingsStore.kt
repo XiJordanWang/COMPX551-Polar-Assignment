@@ -5,10 +5,15 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.polar.data.online.Assessment
 import com.example.polar.logic.CoachMode
 import com.example.polar.logic.DEFAULT_STYLE_ID
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 /** Saves each user's settings on this phone with DataStore: privacy mode, coach mode, plant style and consent. */
 // FULL = "Saved locally", SHARE = "Uploaded to cloud"
@@ -25,7 +30,7 @@ val PrivacyMode.title: String
 val PrivacyMode.description: String
     get() = when (this) {
         PrivacyMode.FULL -> "Data is saved only on your phone. You won't appear on the leaderboard."
-        PrivacyMode.SHARE -> "Workout summaries are uploaded to Supabase so you can participate in the leaderboard."
+        PrivacyMode.SHARE -> "Workout summaries are uploaded online so you can participate in the leaderboard."
     }
 
 private val Context.dataStore by preferencesDataStore(name = "user_settings")
@@ -50,6 +55,51 @@ object SettingsStore {
         val key = stringPreferencesKey("mode_$username")
         context.dataStore.edit { prefs ->
             prefs[key] = mode.name
+        }
+    }
+
+    // The user's assessment saved locally as JSON
+    fun assessment(context: Context, username: String): Flow<Assessment?> {
+        val key = stringPreferencesKey("assessment_$username")
+        return context.dataStore.data.map { prefs ->
+            val json = prefs[key]
+            if (json.isNullOrEmpty()) null
+            else {
+                try {
+                    Json.decodeFromString<Assessment>(json)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+    }
+
+    suspend fun getAssessment(context: Context, username: String): Assessment? {
+        val key = stringPreferencesKey("assessment_$username")
+        val prefs = context.dataStore.data.first()
+        val json = prefs[key]
+        return if (json.isNullOrEmpty()) null
+        else {
+            try {
+                Json.decodeFromString<Assessment>(json)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    suspend fun setAssessment(context: Context, username: String, assessment: Assessment) {
+        val key = stringPreferencesKey("assessment_$username")
+        val json = Json.encodeToString(assessment)
+        context.dataStore.edit { prefs ->
+            prefs[key] = json
+        }
+    }
+
+    suspend fun clearAssessment(context: Context, username: String) {
+        val key = stringPreferencesKey("assessment_$username")
+        context.dataStore.edit { prefs ->
+            prefs.remove(key)
         }
     }
 
@@ -124,12 +174,14 @@ object SettingsStore {
         val timeKey = stringPreferencesKey("consent_time_$username")
         val coachKey = stringPreferencesKey("coach_mode_$username")
         val styleKey = stringPreferencesKey("plant_style_$username")
+        val assessmentKey = stringPreferencesKey("assessment_$username")
         context.dataStore.edit { prefs ->
             prefs.remove(modeKey)
             prefs.remove(versionKey)
             prefs.remove(timeKey)
             prefs.remove(coachKey)
             prefs.remove(styleKey)
+            prefs.remove(assessmentKey)
         }
     }
 }

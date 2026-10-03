@@ -168,8 +168,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
     // If the user did the assessment, use 220 - age instead.
     var userMaxHr by remember { mutableIntStateOf(200) }
     LaunchedEffect(Unit) {
-        // From the online assessments table. If there is no internet we keep 200.
-        val assessment = AssessmentTable.findByUsername(username)
+        val assessment = DataGate.loadAssessment(context, username)
         if (assessment != null) {
             userMaxHr = maxHeartRate(assessment.age)
         }
