@@ -43,7 +43,7 @@ daily/weekly stats, lets users compare plants on a leaderboard, and gives privac
 | **Consent + privacy mode** | First launch: explains what data is collected, where it is stored and who can see it. The user picks **Full**, **Share** or **Read-only**. Can be changed later on the Profile tab. |
 | **Sign in / Sign up** | Username + password (salted PBKDF2 hash) in the online `users` table. "Remember me" skips sign-in next time. |
 | **Home (My Plant)** | Plant grows with total points (Seed → Sprout → Seedling → Young Plant → Blooming). Day streak, today's points, Polar H10 card, last workout, ECG check, assessment. |
-| **Workout** | Pick 1 of 8 sports. Connects to the H10 with the saved device ID and streams HR + accelerometer. Live 60-second line chart and intensity gauge, min/avg/max. **Stop** saves it (depending on privacy mode). |
+| **Workout** | Pick 1 of 8 sports. Uses the Polar H10 connection established by the application and streams live HR + accelerometer data. Live 60-second line chart and intensity gauge, min/avg/max. **Stop** saves it (depending on privacy mode). |
 | **Baseline** | 30-second resting heart rate measurement (first 5 s ignored, stable if max − min < 10 bpm). |
 | **ECG check** | 30-second resting ECG, R-peak detection → resting heart rate. Saved to history. |
 | **Assessment** | Gender, age, height, weight, activity, preferred intensity → BMI, max HR, personal zones, target range. |
@@ -135,7 +135,7 @@ com.example.polar
 │   ├── db/AppDatabase.kt           Room database v7 + migrations                                 Xi, Chathurangi
 │   ├── entity/ dao/                Workout, Device (Xi) · Baseline (Chathurangi) · EcgCheck (Caitlin)
 │   ├── online/                     Supabase client, users/assessments/summaries/leaderboard      Xi, Caitlin
-│   ├── polar/                      PolarManager, SensorData, SensorRepository (BLE SDK)          Chathurangi
+│   ├── polar/                      PolarManager, SharedPolarManager, SensorData, SensorRepository (BLE SDK)          Chathurangi
 │   ├── prefs/                      SessionStore, SettingsStore (privacy + consent)               Caitlin
 │   ├── model/WorkoutType.kt        8 sports + emoji                                              Xi
 │   └── processing/filter_ecg.kt    ECG band-pass filter 0.5–40 Hz                                 Shreyaa
@@ -197,7 +197,7 @@ Supabase → DataGrip (PostgreSQL, Session pooler, SSL require) or the Supabase 
 - **Demo data button writes directly to Room**, so it ignores the privacy mode (debug builds only).
 - Supabase uses the publishable key with open table policies; a real app would use Supabase Auth + row-level security per user.
 - Without internet: sign-in and assessments don't work; workouts are still saved locally.
-
+- Bluetooth, Location Services, and Nearby Devices permissions must be enabled for Polar H10 streaming to work correctly.
 ---
 
 ## Team
