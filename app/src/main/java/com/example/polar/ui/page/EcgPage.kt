@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Screen for recording, viewing, and analyzing 30-second ECG signals from the Polar H10. */
+
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log

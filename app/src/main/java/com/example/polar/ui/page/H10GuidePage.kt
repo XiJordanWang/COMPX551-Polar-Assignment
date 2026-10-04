@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Guide screen helping users connect and wear their Polar H10 heart rate sensor correctly. */
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent

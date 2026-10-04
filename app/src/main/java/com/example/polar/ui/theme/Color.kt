@@ -1,5 +1,7 @@
 package com.example.polar.ui.theme
 
+/** Defines the color palette and custom theme colors used throughout the app. */
+
 import androidx.compose.ui.graphics.Color
 
 val Purple80 = Color(0xFFD0BCFF)

@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Background component monitoring workout heart rates and triggering coaching tips during inactivity. */
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState

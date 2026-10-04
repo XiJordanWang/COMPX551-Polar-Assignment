@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Tab displaying past workouts, activity charts, personal bests, and workout statistics. */
+
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

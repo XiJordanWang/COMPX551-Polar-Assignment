@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Screen for measuring and saving the user's resting heart rate baseline. */
+
 import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast

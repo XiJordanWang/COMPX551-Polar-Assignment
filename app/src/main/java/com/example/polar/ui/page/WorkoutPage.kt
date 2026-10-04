@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Active workout tracking screen displaying live heart rate, timer, zones, and audio/coach feedback. */
+
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log

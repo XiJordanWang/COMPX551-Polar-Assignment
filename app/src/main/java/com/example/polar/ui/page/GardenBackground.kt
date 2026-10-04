@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Animated background drawing gentle nature elements for the garden view. */
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable

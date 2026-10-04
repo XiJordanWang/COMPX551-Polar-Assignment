@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Settings screen for managing profile preferences, coach personality, privacy mode, and data deletion. */
+
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle

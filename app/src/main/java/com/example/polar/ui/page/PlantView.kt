@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Visual component rendering the growing plant, pot styles, plant health, and growth progress. */
+
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState

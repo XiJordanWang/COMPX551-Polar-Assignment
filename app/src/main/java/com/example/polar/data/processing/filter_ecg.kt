@@ -1,5 +1,7 @@
 package com.example.polar.data.processing
 
+/** Filters raw ECG signals to remove baseline drift and high-frequency noise for clear readings. */
+
 import kotlin.math.PI
 
 class EcgFilter(private val samplingRate: Double = 130.0) {

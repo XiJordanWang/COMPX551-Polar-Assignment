@@ -1,5 +1,7 @@
 package com.example.polar.ui.theme
 
+/** Configures typography styles and fonts for Material 3 components. */
+
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font

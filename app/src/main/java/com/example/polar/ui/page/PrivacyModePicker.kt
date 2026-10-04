@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** UI component allowing users to choose between local-only storage or cloud sharing. */
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable

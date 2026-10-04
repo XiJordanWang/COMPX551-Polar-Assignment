@@ -1,5 +1,7 @@
 package com.example.polar.logic
 
+/** Helper functions for formatting time durations and timers into friendly readable strings. */
+
 // 4800 -> "1 hr 20 min", 720 -> "12 min", 45 -> "45 s"
 fun formatDuration(seconds: Int): String {
     val hours = seconds / 3600

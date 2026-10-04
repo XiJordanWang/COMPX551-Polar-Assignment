@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Social leaderboard tab showing community rankings, workout stats, and shared user streaks. */
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement

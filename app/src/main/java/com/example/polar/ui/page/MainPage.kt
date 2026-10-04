@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Main tabbed dashboard hosting the Garden plant view, Workout tab, History tab, and Social leaderboard. */
+
 import android.Manifest
 import android.app.Activity
 import android.content.Intent

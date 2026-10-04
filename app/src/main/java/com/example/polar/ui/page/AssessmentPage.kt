@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Screen where users enter their physical assessment details (age, gender, weight, height, activity level). */
+
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity

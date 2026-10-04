@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Detailed view showing statistics, heart rate charts, and summary info for a completed workout. */
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent

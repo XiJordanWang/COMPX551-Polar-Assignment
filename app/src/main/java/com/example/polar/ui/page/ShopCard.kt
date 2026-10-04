@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Shop card component displaying unlockable plant styles and themes. */
+
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

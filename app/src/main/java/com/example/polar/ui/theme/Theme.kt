@@ -1,5 +1,7 @@
 package com.example.polar.ui.theme
 
+/** Configures Material 3 light and dark color schemes for the app theme. */
+
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

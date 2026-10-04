@@ -1,5 +1,7 @@
 package com.example.polar.logic
 
+/** Calculates health metrics like BMI, max heart rate, calorie burn, and exercise heart rate zones. */
+
 import com.example.polar.data.online.Assessment
 import kotlin.math.roundToInt
 

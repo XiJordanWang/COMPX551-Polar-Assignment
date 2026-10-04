@@ -1,5 +1,7 @@
 package com.example.polar.ui.page
 
+/** Sign in and account registration screen with secure password hashing. */
+
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
