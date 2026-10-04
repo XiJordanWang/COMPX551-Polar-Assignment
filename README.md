@@ -65,6 +65,15 @@ For **every second** of a workout, we compare your heart rate with your resting 
 | +20 to +29 bpm | 2 points per 10 seconds |
 | +30 bpm or more | 3 points per 10 seconds |
 
+- **Points use a fixed baseline of 70 bpm.** The measured baseline (`baselines` table) is shown in Settings but not used for points yet.
+- **Repeated equal HR values are lost:** `WorkoutPage` adds HR in `LaunchedEffect(sensorData.heartRate)`, and a `StateFlow` does not emit the same value twice, so a steady heart rate records fewer seconds.
+- **The ECG band-pass filter (`filter_ecg.kt`) is not called anywhere yet**, and has no `package` line.
+- **No foreground service:** the workout only records while the workout screen is open.
+- **Coach is partly done:** messages, channels and permission exist; the inactivity detector, the mode picker in Settings and the WorkManager streak reminder are not built.
+- **Demo data button writes directly to Room**, so it ignores the privacy mode (debug builds only).
+- Supabase uses the publishable key with open table policies; a real app would use Supabase Auth + row-level security per user.
+- Without internet: sign-in and assessments don't work; workouts are still saved locally.
+- Bluetooth, Location Services, and Nearby Devices permissions must be enabled for Polar H10 streaming to work correctly.
 - Example: 1 minute of hard exercise = **18 points**; a 30-minute workout ≈ **500 points**.
 - Readings that look wrong are ignored: too low, above your maximum heart rate, or a sudden jump.
 - Home-page points are **recalculated** from all your saved workouts. Leaderboard points are **stored** online when each workout is uploaded.

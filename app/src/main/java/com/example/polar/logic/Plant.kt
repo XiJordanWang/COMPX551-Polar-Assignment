@@ -53,13 +53,40 @@ fun progressToNextStage(points: Int): Float {
 
 // ---------- Points ----------
 
+fun totalDailyGoalBonus(
+    workouts: List<Workout>,
+    baseline: Int,
+    age: Int = 25,
+    config: PointsConfig = PointsConfig()
+): Int {
+    val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH)
+    val workoutsByDay = workouts.groupBy {
+        dateFormat.format(java.util.Date(it.startTime))
+    }
+    var totalBonus = 0
+    for ((_, dayWorkouts) in workoutsByDay) {
+        val activeSeconds = dayWorkouts.sumOf {
+            PointsCalculator.calculateActiveSeconds(
+                heartRates = it.heartRateList(),
+                baseline = baseline,
+                age = age,
+                config = config
+            )
+        }
+        if (activeSeconds >= 30 * 60) {
+            totalBonus += 50
+        }
+    }
+    return totalBonus
+}
+
 fun totalPoints(
     workouts: List<Workout>,
     baseline: Int,
     age: Int = 25,
     config: PointsConfig = PointsConfig()
 ): Int {
-    return workouts.sumOf {
+    val exercisePoints = workouts.sumOf {
         PointsCalculator.calculate(
             heartRates = it.heartRateList(),
             baseline = baseline,
@@ -67,6 +94,7 @@ fun totalPoints(
             config = config
         )
     }
+    return exercisePoints + totalDailyGoalBonus(workouts, baseline, age, config)
 }
 
 fun todayPoints(
@@ -75,18 +103,28 @@ fun todayPoints(
     age: Int = 25,
     config: PointsConfig = PointsConfig()
 ): Int {
-    val today = startOfDay(daysAgo = 0)
+    val todayStart = startOfDay(daysAgo = 0)
+    val todayWorkouts = workouts.filter { it.startTime >= todayStart }
+    if (todayWorkouts.isEmpty()) return 0
 
-    return workouts
-        .filter { it.startTime >= today }
-        .sumOf {
-            PointsCalculator.calculate(
-                heartRates = it.heartRateList(),
-                baseline = baseline,
-                age = age,
-                config = config
-            )
-        }
+    val exercisePoints = todayWorkouts.sumOf {
+        PointsCalculator.calculate(
+            heartRates = it.heartRateList(),
+            baseline = baseline,
+            age = age,
+            config = config
+        )
+    }
+    val activeSeconds = todayWorkouts.sumOf {
+        PointsCalculator.calculateActiveSeconds(
+            heartRates = it.heartRateList(),
+            baseline = baseline,
+            age = age,
+            config = config
+        )
+    }
+    val todayBonus = if (activeSeconds >= 30 * 60) 50 else 0
+    return exercisePoints + todayBonus
 }
 
 
