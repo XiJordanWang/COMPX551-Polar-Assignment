@@ -47,8 +47,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.polar.data.DataGate
 import com.example.polar.data.SaveResult
+import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.Workout
 import com.example.polar.data.online.WorkoutSummary
+import com.example.polar.logic.ExerciseZone
 import com.example.polar.logic.formatTime
 import com.example.polar.logic.maxHeartRate
 import com.example.polar.logic.PointsCalculator
@@ -100,17 +102,39 @@ fun WorkoutScreen(workoutType: String, username: String) {
     // Inactivity coach: monitors heart rate stability and alerts if resting during exercise
     InactivityCoach(username = username, sensorData = polarManager.sensorData)
 
+    val db = remember { AppDatabase.getDatabase(context) }
+    val baselineEntity by db.baselineDao().observeBaseline(username).collectAsState(initial = null)
+    val baseline = baselineEntity?.baselineHr ?: PointsCalculator.DEFAULT_BASELINE_HR
+    var age by remember { mutableIntStateOf(25) }
+
     // Calculate maximum heart rate based on user's assessment age, defaulting to 200 BPM
     var userMaxHr by remember { mutableIntStateOf(200) }
     LaunchedEffect(Unit) {
         val assessment = DataGate.loadAssessment(context, username)
         if (assessment != null) {
             userMaxHr = maxHeartRate(assessment.age)
+            age = assessment.age
         }
     }
 
     // List storing one heart rate sample per second for the duration of the workout
     val heartRates = remember { mutableStateListOf<Int>() }
+
+    val livePoints = remember(heartRates, baseline, age) {
+        PointsCalculator.calculate(heartRates, baseline, age)
+    }
+    val currentZone = remember(sensorData.heartRate, baseline, age) {
+        if (sensorData.heartRate <= 0) "Resting"
+        else {
+            when (PointsCalculator.getZone(sensorData.heartRate, baseline, age)) {
+                ExerciseZone.BELOW_TARGET -> "Below Target"
+                ExerciseZone.LOW -> "Low (+10)"
+                ExerciseZone.MODERATE -> "Moderate (+20)"
+                ExerciseZone.INTENSE -> "Intense (+30)"
+                ExerciseZone.ABOVE_CAP -> "Above Cap"
+            }
+        }
+    }
 
     // Coroutine loop sampling heart rate values once per second from PolarManager
     LaunchedEffect(Unit) {
@@ -194,6 +218,14 @@ fun WorkoutScreen(workoutType: String, username: String) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Live points and current zone
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard(label = "Live Points", value = "$livePoints", unit = "pts", modifier = Modifier.weight(1f))
+                StatCard(label = "Zone", value = currentZone, unit = "", modifier = Modifier.weight(1f))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // Secondary metrics: minimum, average, and maximum heart rate
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Row {
@@ -264,6 +296,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
                     if (heartRates.isEmpty()) {
                         (context as Activity).finish()
                     } else {
+                        val points = PointsCalculator.calculate(heartRates, baseline, age)
                         val workout = Workout(
                             username = username,
                             type = workoutType,
@@ -282,7 +315,7 @@ fun WorkoutScreen(workoutType: String, username: String) {
                             minHr = minHr,
                             avgHr = avgHr,
                             maxHr = maxHr,
-                            points = PointsCalculator.calculate(heartRates, PointsCalculator.DEFAULT_BASELINE_HR)
+                            points = points
                         )
                         scope.launch {
                             val result = DataGate.saveWorkout(context, username, workout, summary)

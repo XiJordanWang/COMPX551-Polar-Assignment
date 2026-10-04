@@ -360,11 +360,21 @@ fun HomeContent(
     onDeviceClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val db = remember { AppDatabase.getDatabase(context) }
+    val baselineEntity by db.baselineDao().observeBaseline(username).collectAsState(initial = null)
+    val baseline = baselineEntity?.baselineHr ?: PointsCalculator.DEFAULT_BASELINE_HR
 
-    // Calculate total points, today's points, and workout streak from history
-    val baseline = PointsCalculator.DEFAULT_BASELINE_HR
-    val points = remember(workouts) { totalPoints(workouts, baseline) }
-    val today = remember(workouts) { todayPoints(workouts, baseline) }
+    var age by remember { mutableIntStateOf(25) }
+    LaunchedEffect(username) {
+        val assessment = DataGate.loadAssessment(context, username)
+        if (assessment != null) {
+            age = assessment.age
+        }
+    }
+
+    // Calculate total points, today's points, and workout streak from history using user's baseline and age
+    val points = remember(workouts, baseline, age) { totalPoints(workouts, baseline, age) }
+    val today = remember(workouts, baseline, age) { todayPoints(workouts, baseline, age) }
     val streak = remember(workouts) { streakDays(workouts) }
 
     // Plant cosmetic style preference
