@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.polar.data.DataGate
 import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.heartRateList
 import com.example.polar.data.online.AssessmentTable
@@ -198,8 +199,14 @@ fun SettingsScreen(username: String) {
                             } else {
                                 WorkoutSummaryTable.deleteForUser(username)
                                 val localWorkouts = db.workoutDao().getWorkouts(username).first()
+                                val baselineEntity = db.baselineDao().observeBaseline(username).first()
+                                val baseline = baselineEntity?.baselineHr ?: PointsCalculator.DEFAULT_BASELINE_HR
+                                val assessment = DataGate.loadAssessment(context, username)
+                                val age = assessment?.age ?: 25
+
                                 var uploaded = 0
                                 for (w in localWorkouts) {
+                                    val points = PointsCalculator.calculate(w.heartRateList(), baseline, age)
                                     val summary = WorkoutSummary(
                                         username = username,
                                         type = w.type,
@@ -208,7 +215,7 @@ fun SettingsScreen(username: String) {
                                         minHr = w.minHr,
                                         avgHr = w.avgHr,
                                         maxHr = w.maxHr,
-                                        points = PointsCalculator.calculate(w.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR)
+                                        points = points
                                     )
                                     if (WorkoutSummaryTable.insert(summary)) uploaded++
                                 }
