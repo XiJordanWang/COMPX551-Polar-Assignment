@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -162,6 +163,28 @@ fun WorkoutScreen(workoutType: String, username: String) {
             )
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Connection notification banner shown when Polar H10 is disconnected
+            if (!sensorData.connected) {
+                GlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "⚠️", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Polar H10 Disconnected",
+                                color = Color(0xFFFFD54F),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
 
             // Primary metrics: elapsed time and current live heart rate
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

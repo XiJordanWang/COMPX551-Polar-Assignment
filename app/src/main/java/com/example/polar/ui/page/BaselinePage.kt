@@ -2,6 +2,7 @@ package com.example.polar.ui.page
 
 import android.app.Activity
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,13 +22,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,17 +38,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.polar.data.DataGate
+import com.example.polar.data.db.AppDatabase
+import com.example.polar.data.entity.Baseline
+import com.example.polar.data.polar.PolarManager
+import com.example.polar.data.polar.SharedPolarManager
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
-import com.example.polar.data.polar.PolarManager
-import androidx.compose.runtime.collectAsState
-import com.example.polar.data.DataGate
-import com.example.polar.data.db.AppDatabase
-import com.example.polar.data.entity.Baseline
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 
 // Duration of the baseline measurement
 private const val BASELINE_SECONDS = 30
@@ -70,7 +71,9 @@ fun BaselineScreen(username: String = "demo") {
     val scope = rememberCoroutineScope()
 
     val polarManager = remember {
-        PolarManager(context)
+        SharedPolarManager.polarManager ?: PolarManager(context).also {
+            SharedPolarManager.polarManager = it
+        }
     }
     val db = remember {
         AppDatabase.getDatabase(context)
@@ -79,24 +82,17 @@ fun BaselineScreen(username: String = "demo") {
         db.deviceDao().observeDeviceId(username)
     }
     val deviceId by deviceIdFlow.collectAsState(initial = null)
+    val sensorData by polarManager.sensorData.collectAsState()
 
     LaunchedEffect(deviceId) {
-        if (!deviceId.isNullOrBlank()) {
+        if (!deviceId.isNullOrBlank() && !sensorData.connected) {
             polarManager.connect(deviceId!!)
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            polarManager.disconnect(deviceId)
         }
     }
 
     var restingHr by remember {
         mutableIntStateOf(0)
     }
-
-    val sensorData by polarManager.sensorData.collectAsState()
 
     // "ready" -> "measuring" -> "done"
     var status by remember { mutableStateOf("ready") }
@@ -111,17 +107,12 @@ fun BaselineScreen(username: String = "demo") {
         mutableStateListOf<Int>()
     }
 
-
     LaunchedEffect(status) {
-
         if (status == "measuring") {
-
             baselineValues.clear()
 
             for (second in 1..BASELINE_SECONDS) {
-
                 delay(1000)
-
                 secondsLeft = BASELINE_SECONDS - second
 
                 // Ignore first 5 seconds
@@ -182,17 +173,13 @@ fun BaselineScreen(username: String = "demo") {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = when (status) {
-                    "ready" ->
-                        "Sit relaxed and remain still. We will measure your resting heart rate baseline over 30 seconds."
-
-                    "measuring" ->
-                        "Recording... stay still. $secondsLeft s left"
-
-                    else ->
-                        "Baseline measurement completed."
+                text = when {
+                    status == "measuring" -> "Recording... stay still. $secondsLeft s left"
+                    status == "done" -> "Baseline measurement completed."
+                    sensorData.connected -> "Sit relaxed and remain still. We will measure your resting heart rate baseline over 30 seconds."
+                    else -> "Polar H10 device is not connected. Please check device connection."
                 },
-                color = Color.White.copy(alpha = 0.85f),
+                color = if (!sensorData.connected && status == "ready") Color(0xFFFFD54F) else Color.White.copy(alpha = 0.85f),
                 fontSize = 16.sp
             )
 
@@ -219,6 +206,16 @@ fun BaselineScreen(username: String = "demo") {
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 18.sp
                     )
+
+                    if (!sensorData.connected) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "⚠️ Check device connection (power or Bluetooth)",
+                            color = Color(0xFFFFD54F),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
@@ -266,8 +263,16 @@ fun BaselineScreen(username: String = "demo") {
                     if (status == "done") {
                         (context as Activity).finish()
                     } else {
-                        secondsLeft = BASELINE_SECONDS
-                        status = "measuring"
+                        if (!sensorData.connected) {
+                            Toast.makeText(
+                                context,
+                                "Polar H10 device is not connected. Please check device connection.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            secondsLeft = BASELINE_SECONDS
+                            status = "measuring"
+                        }
                     }
                 },
                 enabled = status != "measuring",
@@ -284,7 +289,7 @@ fun BaselineScreen(username: String = "demo") {
             ) {
                 Text(
                     text = when (status) {
-                        "ready" -> "Start Baseline"
+                        "ready" -> if (sensorData.connected) "Start Baseline" else "Device Not Connected"
                         "measuring" -> "Recording... $secondsLeft s"
                         else -> "Done"
                     },

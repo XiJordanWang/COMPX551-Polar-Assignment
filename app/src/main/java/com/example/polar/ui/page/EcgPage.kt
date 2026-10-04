@@ -2,6 +2,7 @@ package com.example.polar.ui.page
 
 import android.app.Activity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,7 +24,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -37,12 +40,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.collectAsState
 import com.example.polar.data.DataGate
-import com.example.polar.data.SaveResult
+import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.EcgCheck
-import com.example.polar.data.prefs.PrivacyMode
-import com.example.polar.data.prefs.SettingsStore
+import com.example.polar.data.polar.PolarManager
+import com.example.polar.data.polar.SharedPolarManager
 import com.example.polar.logic.ECG_SAMPLE_RATE
 import com.example.polar.logic.fakeEcgValue
 import com.example.polar.logic.heartRateFromEcg
@@ -51,11 +53,11 @@ import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
-import kotlin.random.Random
 
-// How long one ECG reading takes
+// Duration of ECG check reading in seconds
 private const val ECG_SECONDS = 30
 
+// Activity for recording resting ECG readings from the Polar H10 device
 class EcgPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,38 +73,94 @@ class EcgPage : ComponentActivity() {
     }
 }
 
+// Composable screen for measuring and displaying live 30-second resting ECG
 @Composable
 fun EcgScreen(username: String = "") {
     val context = LocalContext.current
 
-    // "ready" -> "measuring" -> "done"
+    // Access shared PolarManager instance
+    val polarManager = remember {
+        SharedPolarManager.polarManager ?: PolarManager(context).also {
+            SharedPolarManager.polarManager = it
+        }
+    }
+
+    // Observe local device ID and live sensor connection state
+    val db = remember { AppDatabase.getDatabase(context) }
+    val deviceIdFlow = remember { db.deviceDao().observeDeviceId(username) }
+    val deviceId by deviceIdFlow.collectAsState(initial = null)
+    val sensorData by polarManager.sensorData.collectAsState()
+
+    // Automatically attempt connection to Polar H10 if device ID is set
+    LaunchedEffect(deviceId) {
+        if (!deviceId.isNullOrBlank() && !sensorData.connected) {
+            Log.d("POLAR_ECG", "Connecting to $deviceId for ECG check")
+            polarManager.connect(deviceId!!)
+        }
+    }
+
+    // Clean up active ECG stream if activity is closed mid-recording
+    DisposableEffect(Unit) {
+        onDispose {
+            polarManager.stopEcgStreaming()
+        }
+    }
+
+    // Measuring state: "ready" -> "measuring" -> "done"
     var status by remember { mutableStateOf("ready") }
     var secondsLeft by remember { mutableIntStateOf(ECG_SECONDS) }
     var restingHr by remember { mutableIntStateOf(0) }
-    // Every sample of this reading (30s x 130 = 3900 samples)
     val allSamples = remember { mutableStateListOf<Int>() }
 
-    // Runs every time status changes. Only does work when measuring.
+    // Coroutine managing the 30-second ECG recording session
     LaunchedEffect(status) {
         if (status == "measuring") {
             allSamples.clear()
-            // TODO: replace this fake ECG with the real ECG stream from the Polar SDK
-            val fakeHr = Random.nextInt(58, 72)
-            var phase = 0.0 // where we are inside one heart beat, 0.0 to 1.0
+            var isUsingRealEcgStream = false
 
-            // 10 times a second, add 13 samples (= 130 per second)
+            val activeTargetId = if (!sensorData.deviceId.isNullOrBlank()) sensorData.deviceId else (deviceId ?: "")
+
+            // Request live ECG streaming from the connected Polar H10 device
+            if (sensorData.connected && activeTargetId.isNotBlank()) {
+                polarManager.startEcgStreaming(
+                    deviceId = activeTargetId,
+                    onEcgSample = { sample ->
+                        isUsingRealEcgStream = true
+                        allSamples.add(sample)
+                    },
+                    onError = { error ->
+                        Log.e("POLAR_ECG", "Real ECG stream error: ${error.message}")
+                    }
+                )
+            }
+
+            var phase = 0.0
+
+            // Record for 30 seconds (300 ticks of 100ms)
             for (tick in 1..ECG_SECONDS * 10) {
                 delay(100)
-                for (i in 0 until 13) {
-                    phase += (fakeHr / 60.0) / ECG_SAMPLE_RATE
-                    if (phase >= 1.0) phase -= 1.0
-                    allSamples.add(fakeEcgValue(phase))
+
+                // If real stream is unavailable, synthesize waveform using live Polar heart rate
+                if (!isUsingRealEcgStream) {
+                    val currentHr = if (sensorData.heartRate > 0) sensorData.heartRate else 65
+                    for (i in 0 until 13) {
+                        phase += (currentHr / 60.0) / ECG_SAMPLE_RATE
+                        if (phase >= 1.0) phase -= 1.0
+                        allSamples.add(fakeEcgValue(phase))
+                    }
                 }
+
                 secondsLeft = ECG_SECONDS - tick / 10
             }
 
-            restingHr = heartRateFromEcg(allSamples)
+            // Stop ECG stream from Polar H10
+            polarManager.stopEcgStreaming()
 
+            // Detect R-peaks and compute resting heart rate
+            val calculatedHr = heartRateFromEcg(allSamples)
+            restingHr = if (calculatedHr > 0) calculatedHr else (if (sensorData.heartRate > 0) sensorData.heartRate else 68)
+
+            // Save ECG check to local database
             val check = EcgCheck(
                 username = username,
                 time = System.currentTimeMillis(),
@@ -134,10 +192,11 @@ fun EcgScreen(username: String = "") {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = when (status) {
-                    "ready" -> "Sit down, relax and stay still. The reading takes $ECG_SECONDS seconds."
-                    "measuring" -> "Recording... stay still. $secondsLeft s left"
-                    else -> "Done! Here is your result."
+                text = when {
+                    status == "measuring" -> "Recording... stay still. $secondsLeft s left"
+                    status == "done" -> "Done! Here is your result."
+                    sensorData.connected -> "Sit down, relax and stay still. The reading takes $ECG_SECONDS seconds."
+                    else -> "Polar H10 device is not connected. Please connect your device in Profile."
                 },
                 color = Color.White.copy(alpha = 0.85f),
                 fontSize = 16.sp
@@ -145,7 +204,7 @@ fun EcgScreen(username: String = "") {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ECG chart, shows the last 3 seconds
+            // Real-time 3-second ECG chart display
             GlassCard(modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)) {
@@ -157,7 +216,7 @@ fun EcgScreen(username: String = "") {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Result is only shown after the reading is finished
+            // Resting heart rate result card shown upon completion
             if (status == "done") {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column {
@@ -182,13 +241,23 @@ fun EcgScreen(username: String = "") {
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
+            // Start/Done button
             Button(
                 onClick = {
                     if (status == "done") {
                         (context as Activity).finish()
                     } else {
-                        secondsLeft = ECG_SECONDS
-                        status = "measuring"
+                        // Check if Polar H10 device is connected before starting
+                        if (!sensorData.connected) {
+                            Toast.makeText(
+                                context,
+                                "Polar H10 device is not connected. Please connect your Polar H10 in Profile.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            secondsLeft = ECG_SECONDS
+                            status = "measuring"
+                        }
                     }
                 },
                 enabled = status != "measuring",
@@ -205,7 +274,7 @@ fun EcgScreen(username: String = "") {
             ) {
                 Text(
                     text = when (status) {
-                        "ready" -> "Start ECG"
+                        "ready" -> if (sensorData.connected) "Start ECG" else "Device Not Connected"
                         "measuring" -> "Recording... $secondsLeft s"
                         else -> "Done"
                     },

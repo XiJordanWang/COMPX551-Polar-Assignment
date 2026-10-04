@@ -34,6 +34,8 @@ class PolarManager(context: Context) {
     private var hrDisposable: Disposable? = null
     // Holds the subscription to the accelerometer data stream
     private var accDisposable: Disposable? = null
+    // Holds the subscription to the live ECG stream
+    private var ecgDisposable: Disposable? = null
 
     init {
         // Enable automatic reconnection if the Bluetooth connection drops
@@ -152,6 +154,38 @@ class PolarManager(context: Context) {
             )
     }
 
+    // Subscribes to live ECG streaming from the Polar device
+    fun startEcgStreaming(
+        deviceId: String,
+        onEcgSample: (Int) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        ecgDisposable?.dispose()
+        ecgDisposable = api.requestStreamSettings(deviceId, PolarBleApi.PolarDeviceDataType.ECG)
+            .flatMapPublisher { settings ->
+                api.startEcgStreaming(deviceId, settings)
+            }
+            .subscribe(
+                { polarEcgData ->
+                    for (sample in polarEcgData.samples) {
+                        onEcgSample(sample.voltage)
+                    }
+                },
+                { error ->
+                    Log.e("POLAR", "Error streaming ECG: ${error.message}", error)
+                    ecgDisposable?.dispose()
+                    ecgDisposable = null
+                    onError(error)
+                }
+            )
+    }
+
+    // Stops any active ECG streaming
+    fun stopEcgStreaming() {
+        ecgDisposable?.dispose()
+        ecgDisposable = null
+    }
+
     // Connects to a Polar H10 device using its 8-character device ID
     fun connect(deviceId: String) {
         if (deviceId.isBlank()) return
@@ -188,11 +222,13 @@ class PolarManager(context: Context) {
         }
     }
 
-    // Stops and cleans up active RxJava data subscriptions (HR and ACC)
+    // Stops and cleans up active RxJava data subscriptions (HR, ACC, and ECG)
     private fun cleanupStreams() {
         hrDisposable?.dispose()
         hrDisposable = null
         accDisposable?.dispose()
         accDisposable = null
+        ecgDisposable?.dispose()
+        ecgDisposable = null
     }
 }
