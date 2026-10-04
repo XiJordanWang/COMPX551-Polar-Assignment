@@ -54,11 +54,13 @@ import com.example.polar.logic.ExerciseZone
 import com.example.polar.logic.formatTime
 import com.example.polar.logic.maxHeartRate
 import com.example.polar.logic.PointsCalculator
+import com.example.polar.logic.calculateWorkoutPoints
 import com.example.polar.service.WorkoutService
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.example.polar.data.polar.SharedPolarManager
 
@@ -296,7 +298,6 @@ fun WorkoutScreen(workoutType: String, username: String) {
                     if (heartRates.isEmpty()) {
                         (context as Activity).finish()
                     } else {
-                        val points = PointsCalculator.calculate(heartRates, baseline, age)
                         val workout = Workout(
                             username = username,
                             type = workoutType,
@@ -307,17 +308,19 @@ fun WorkoutScreen(workoutType: String, username: String) {
                             maxHr = maxHr,
                             heartRates = heartRates.joinToString(",")
                         )
-                        val summary = WorkoutSummary(
-                            username = username,
-                            type = workoutType,
-                            startTime = startTime,
-                            durationSec = heartRates.size,
-                            minHr = minHr,
-                            avgHr = avgHr,
-                            maxHr = maxHr,
-                            points = points
-                        )
                         scope.launch {
+                            val existingWorkouts = db.workoutDao().getWorkouts(username).first()
+                            val points = calculateWorkoutPoints(workout, existingWorkouts + workout, baseline, age)
+                            val summary = WorkoutSummary(
+                                username = username,
+                                type = workoutType,
+                                startTime = startTime,
+                                durationSec = heartRates.size,
+                                minHr = minHr,
+                                avgHr = avgHr,
+                                maxHr = maxHr,
+                                points = points
+                            )
                             val result = DataGate.saveWorkout(context, username, workout, summary)
                             val message = when (result) {
                                 SaveResult.SAVED_LOCAL_AND_ONLINE -> "Workout saved & uploaded to cloud"

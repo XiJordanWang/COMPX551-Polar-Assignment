@@ -48,17 +48,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.polar.data.DataGate
 import com.example.polar.data.db.AppDatabase
-import com.example.polar.data.entity.heartRateList
 import com.example.polar.data.online.AssessmentTable
 import com.example.polar.data.online.UserTable
-import com.example.polar.data.online.WorkoutSummary
 import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.data.prefs.PrivacyMode
 import com.example.polar.data.prefs.SessionStore
 import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.CoachMode
-import com.example.polar.logic.PointsCalculator
-import com.example.polar.logic.streakDays
 import com.example.polar.ui.theme.Orange
 import com.example.polar.ui.theme.PolarTheme
 import com.example.polar.ui.theme.WorkSans
@@ -189,38 +185,16 @@ fun SettingsScreen(username: String) {
                             UserTable.setSharing(username, isSharing)
 
                             if (!isSharing) {
-                                WorkoutSummaryTable.deleteForUser(username)
-                                AssessmentTable.deleteForUser(username)
+                                // Keep a copy of the online assessment on the phone before deleting it online
                                 val onlineAssessment = AssessmentTable.findByUsername(username)
                                 if (onlineAssessment != null) {
                                     SettingsStore.setAssessment(context, username, onlineAssessment)
                                 }
+                                WorkoutSummaryTable.deleteForUser(username)
+                                AssessmentTable.deleteForUser(username)
                                 Toast.makeText(context, "Privacy mode updated. Saved locally.", Toast.LENGTH_SHORT).show()
                             } else {
-                                WorkoutSummaryTable.deleteForUser(username)
-                                val localWorkouts = db.workoutDao().getWorkouts(username).first()
-                                val baselineEntity = db.baselineDao().observeBaseline(username).first()
-                                val baseline = baselineEntity?.baselineHr ?: PointsCalculator.DEFAULT_BASELINE_HR
-                                val assessment = DataGate.loadAssessment(context, username)
-                                val age = assessment?.age ?: 25
-
-                                var uploaded = 0
-                                for (w in localWorkouts) {
-                                    val points = PointsCalculator.calculate(w.heartRateList(), baseline, age)
-                                    val summary = WorkoutSummary(
-                                        username = username,
-                                        type = w.type,
-                                        startTime = w.startTime,
-                                        durationSec = w.durationSec,
-                                        minHr = w.minHr,
-                                        avgHr = w.avgHr,
-                                        maxHr = w.maxHr,
-                                        points = points
-                                    )
-                                    if (WorkoutSummaryTable.insert(summary)) uploaded++
-                                }
-                                val streak = streakDays(localWorkouts)
-                                UserTable.setStreak(username, streak)
+                                val uploaded = DataGate.uploadAllWorkouts(context, username)
                                 val localAssessment = SettingsStore.getAssessment(context, username)
                                 if (localAssessment != null) {
                                     AssessmentTable.save(localAssessment)

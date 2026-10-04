@@ -12,6 +12,8 @@ import com.example.polar.data.online.WorkoutSummary
 import com.example.polar.data.online.WorkoutSummaryTable
 import com.example.polar.data.prefs.PrivacyMode
 import com.example.polar.data.prefs.SettingsStore
+import com.example.polar.logic.PointsCalculator
+import com.example.polar.logic.calculateWorkoutPoints
 import com.example.polar.logic.streakDays
 import kotlinx.coroutines.flow.first
 
@@ -45,6 +47,37 @@ object DataGate {
         } else {
             SaveResult.SAVED_LOCAL_ONLY
         }
+    }
+
+    // Re-uploads every workout on the phone (used when the user turns on "Uploaded to cloud").
+    // Uses calculateWorkoutPoints, the same as the home screen, so the daily goal bonus is included
+    // and the online total matches the plant. Returns how many workouts were uploaded.
+    suspend fun uploadAllWorkouts(context: Context, username: String): Int {
+        val db = AppDatabase.getDatabase(context)
+        val localWorkouts = db.workoutDao().getWorkouts(username).first()
+        val baseline = db.baselineDao().observeBaseline(username).first()?.baselineHr
+            ?: PointsCalculator.DEFAULT_BASELINE_HR
+        val age = loadAssessment(context, username)?.age ?: 25
+
+        // Clear old online summaries first so nothing is counted twice
+        WorkoutSummaryTable.deleteForUser(username)
+
+        val summaries = localWorkouts.map { w ->
+            WorkoutSummary(
+                username = username,
+                type = w.type,
+                startTime = w.startTime,
+                durationSec = w.durationSec,
+                minHr = w.minHr,
+                avgHr = w.avgHr,
+                maxHr = w.maxHr,
+                points = calculateWorkoutPoints(w, localWorkouts, baseline, age)
+            )
+        }
+        val uploaded = if (WorkoutSummaryTable.insertAll(summaries)) summaries.size else 0
+
+        UserTable.setStreak(username, streakDays(localWorkouts))
+        return uploaded
     }
 
     // Load assessment based on privacy mode (local DataStore or online table)

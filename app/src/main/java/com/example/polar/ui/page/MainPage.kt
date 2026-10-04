@@ -81,7 +81,9 @@ import com.example.polar.data.model.WorkoutType
 import com.example.polar.data.model.emojiFor
 import com.example.polar.data.model.workoutTypes
 import com.example.polar.data.online.Assessment
+import com.example.polar.data.online.UserTable
 import com.example.polar.data.online.WorkoutSummary
+import com.example.polar.data.prefs.PrivacyMode
 import com.example.polar.data.prefs.SessionStore
 import com.example.polar.data.prefs.SettingsStore
 import com.example.polar.logic.CoachMode
@@ -97,7 +99,10 @@ import com.example.polar.logic.pickMessage
 import com.example.polar.logic.streakDays
 import com.example.polar.logic.todayPoints
 import com.example.polar.logic.totalPoints
+import com.example.polar.logic.calculateWorkoutPoints
 import com.example.polar.logic.usableStyle
+import com.example.polar.data.online.WorkoutSummaryTable
+import kotlinx.coroutines.flow.first
 import com.example.polar.notify.CoachNotifier
 import com.example.polar.ui.theme.FieldGrey
 import com.example.polar.ui.theme.Orange
@@ -619,26 +624,48 @@ fun DemoDataCard(username: String) {
                         val workoutDao = AppDatabase.getDatabase(context).workoutDao()
                         val alreadySaved = workoutDao.getStartTimes(username)
                         val workouts = demoWorkouts(username).filter { it.startTime !in alreadySaved }
+                        val existingWorkouts = workoutDao.getWorkouts(username).first()
+                        val allWorkoutsForCalc = (existingWorkouts + workouts).distinctBy { it.startTime }
+
+                        val baselineEntity = AppDatabase.getDatabase(context).baselineDao().observeBaseline(username).first()
+                        val baseline = baselineEntity?.baselineHr ?: PointsCalculator.DEFAULT_BASELINE_HR
+                        val assessment = DataGate.loadAssessment(context, username)
+                        val age = assessment?.age ?: 25
+
+                        val mode = SettingsStore.privacyMode(context, username).first()
 
                         var savedCount = 0
-                        var uploaded = 0
+                        val summaries = mutableListOf<WorkoutSummary>()
                         for (workout in workouts) {
-                            val summary = WorkoutSummary(
-                                username = username,
-                                type = workout.type,
-                                startTime = workout.startTime,
-                                durationSec = workout.durationSec,
-                                minHr = workout.minHr,
-                                avgHr = workout.avgHr,
-                                maxHr = workout.maxHr,
-                                points = PointsCalculator.calculate(workout.heartRateList(), PointsCalculator.DEFAULT_BASELINE_HR)
-                            )
-                            val res = DataGate.saveWorkout(context, username, workout, summary)
+                            workoutDao.insert(workout)
                             savedCount++
-                            if (res == SaveResult.SAVED_LOCAL_AND_ONLINE) {
-                                uploaded++
+                            val points = calculateWorkoutPoints(workout, allWorkoutsForCalc, baseline, age)
+                            summaries.add(
+                                WorkoutSummary(
+                                    username = username,
+                                    type = workout.type,
+                                    startTime = workout.startTime,
+                                    durationSec = workout.durationSec,
+                                    minHr = workout.minHr,
+                                    avgHr = workout.avgHr,
+                                    maxHr = workout.maxHr,
+                                    points = points
+                                )
+                            )
+                        }
+
+                        var uploaded = 0
+                        if (mode == PrivacyMode.SHARE && summaries.isNotEmpty()) {
+                            val success = WorkoutSummaryTable.insertAll(summaries)
+                            if (success) {
+                                uploaded = summaries.size
+                                val allWorkouts = workoutDao.getWorkouts(username).first()
+                                val streak = streakDays(allWorkouts)
+                                UserTable.setStreak(username, streak)
+                                UserTable.setSharing(username, true)
                             }
                         }
+
                         adding = false
                         val message = if (workouts.isEmpty()) "Demo workouts are already added" else "Added $savedCount demo workouts ($uploaded uploaded to cloud)"
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()

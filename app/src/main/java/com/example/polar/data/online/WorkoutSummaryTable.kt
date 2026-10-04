@@ -20,6 +20,19 @@ object WorkoutSummaryTable {
         }
     }
 
+    // Batch insert list of summaries using individual insert calls for robust serialization
+    suspend fun insertAll(summaries: List<WorkoutSummary>): Boolean {
+        if (summaries.isEmpty()) return true
+        var allSuccess = true
+        for (summary in summaries) {
+            val ok = insert(summary)
+            if (!ok) {
+                allSuccess = false
+            }
+        }
+        return allSuccess
+    }
+
     // Removes all of this user's summaries (when they switch to "Saved locally" or delete their data).
     // true = deleted, false = something went wrong
     suspend fun deleteForUser(username: String): Boolean {
