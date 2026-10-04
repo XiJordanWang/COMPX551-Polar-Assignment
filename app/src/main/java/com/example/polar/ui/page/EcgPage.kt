@@ -45,6 +45,7 @@ import com.example.polar.data.db.AppDatabase
 import com.example.polar.data.entity.EcgCheck
 import com.example.polar.data.polar.PolarManager
 import com.example.polar.data.polar.SharedPolarManager
+import com.example.polar.data.processing.EcgFilter
 import com.example.polar.logic.ECG_SAMPLE_RATE
 import com.example.polar.logic.fakeEcgValue
 import com.example.polar.logic.heartRateFromEcg
@@ -156,16 +157,20 @@ fun EcgScreen(username: String = "") {
             // Stop ECG stream from Polar H10
             polarManager.stopEcgStreaming()
 
-            // Detect R-peaks and compute resting heart rate
-            val calculatedHr = heartRateFromEcg(allSamples)
+            // Apply ECG band-pass filter (0.5–40 Hz) to remove baseline drift and noise
+            val ecgFilter = EcgFilter()
+            val filteredSamples = allSamples.map { ecgFilter.filter(it.toDouble()).toInt() }
+
+            // Detect R-peaks and compute resting heart rate using filtered data
+            val calculatedHr = heartRateFromEcg(filteredSamples)
             restingHr = if (calculatedHr > 0) calculatedHr else (if (sensorData.heartRate > 0) sensorData.heartRate else 68)
 
-            // Save ECG check to local database
+            // Save filtered ECG check to local database
             val check = EcgCheck(
                 username = username,
                 time = System.currentTimeMillis(),
                 restingHr = restingHr,
-                samples = allSamples.joinToString(",")
+                samples = filteredSamples.joinToString(",")
             )
             DataGate.saveEcg(context, username, check)
 

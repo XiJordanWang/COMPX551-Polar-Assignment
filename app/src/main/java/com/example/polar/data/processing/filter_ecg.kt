@@ -1,3 +1,5 @@
+package com.example.polar.data.processing
+
 import kotlin.math.PI
 
 class EcgFilter(private val samplingRate: Double = 130.0) {
