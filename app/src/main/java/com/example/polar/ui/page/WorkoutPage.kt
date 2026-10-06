@@ -127,15 +127,15 @@ fun WorkoutScreen(workoutType: String, username: String) {
     val livePoints = remember(heartRates, baseline, age) {
         PointsCalculator.calculate(heartRates, baseline, age)
     }
-    val currentZone = remember(sensorData.heartRate, baseline, age) {
-        if (sensorData.heartRate <= 0) "Resting"
+    val (zoneValue, zoneUnit) = remember(sensorData.heartRate, baseline, age) {
+        if (sensorData.heartRate <= 0) "Resting" to ""
         else {
             when (PointsCalculator.getZone(sensorData.heartRate, baseline, age)) {
-                ExerciseZone.BELOW_TARGET -> "Below Target"
-                ExerciseZone.LOW -> "Low (+10)"
-                ExerciseZone.MODERATE -> "Moderate (+20)"
-                ExerciseZone.INTENSE -> "Intense (+30)"
-                ExerciseZone.ABOVE_CAP -> "Above Cap"
+                ExerciseZone.BELOW_TARGET -> "Below" to "Target"
+                ExerciseZone.LOW -> "Low" to "+10"
+                ExerciseZone.MODERATE -> "Moderate" to "+20"
+                ExerciseZone.INTENSE -> "Intense" to "+30"
+                ExerciseZone.ABOVE_CAP -> "Above" to "Cap"
             }
         }
     }
@@ -214,18 +214,37 @@ fun WorkoutScreen(workoutType: String, username: String) {
                 }
             }
 
-            // Primary metrics: elapsed time and current live heart rate
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(label = "Time", value = formatTime(seconds), unit = "", modifier = Modifier.weight(1f))
-                StatCard(label = "Heart Rate", value = "$currentHr", unit = "bpm", modifier = Modifier.weight(1f))
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Live points and current zone
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(label = "Live Points", value = "$livePoints", unit = "pts", modifier = Modifier.weight(1f))
-                StatCard(label = "Zone", value = currentZone, unit = "", modifier = Modifier.weight(1f))
+            // Primary metrics: Time, Heart Rate, Live Points, and Zone merged into one row
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    WorkoutStatItem(
+                        label = "Time",
+                        value = formatTime(seconds),
+                        modifier = Modifier.weight(1f)
+                    )
+                    WorkoutStatItem(
+                        label = "Heart Rate",
+                        value = currentHr.toString(),
+                        unit = "bpm",
+                        modifier = Modifier.weight(1f)
+                    )
+                    WorkoutStatItem(
+                        label = "Live Points",
+                        value = livePoints.toString(),
+                        unit = "pts",
+                        modifier = Modifier.weight(1f)
+                    )
+                    WorkoutStatItem(
+                        label = "Zone",
+                        value = zoneValue,
+                        unit = zoneUnit,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -352,5 +371,42 @@ fun SmallStat(label: String, value: Int, modifier: Modifier = Modifier) {
         Text(text = label, color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
         Text(text = "$value", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text(text = "bpm", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+    }
+}
+
+// Stat display item for top metrics row (Time, HR, Points, Zone)
+@Composable
+fun WorkoutStatItem(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    unit: String = ""
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = unit.ifEmpty { " " },
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 11.sp,
+            maxLines = 1
+        )
     }
 }
